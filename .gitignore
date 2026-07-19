@@ -1,0 +1,27 @@
+# Python 컴파일 및 캐시 파일
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# API 키 저장 파일 (유출 방지 핵심)
+*key.txt
+deepl_key.txt
+gemini_key.txt
+.env
+.secrets
+
+# OS 임시 파일
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+.DS_Store
+
+# 번역/요약 작업 중 임시로 생성된 테스트 파일 유출 방지
+# (단, 프로젝트 설명 문서인 README.md 등은 업로드되도록 예외 처리)
+*.html
+!index.html
+!README.md
+!개발관련1.md
+!개발관련2.md
+!설치및사용방법.md

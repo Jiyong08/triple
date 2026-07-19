@@ -1,0 +1,2065 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>triple - AI 번역 및 요약 에디터</title>
+    <!-- Google Fonts - Inter & Noto Sans KR -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Noto+Sans+KR:wght@300;400;500;700&display=swap" rel="stylesheet">
+    <!-- Marked.js for Markdown parsing -->
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <style>
+        :root {
+            --bg-base: #0f172a;
+            --bg-surface: #1e293b;
+            --bg-element: #334155;
+            --bg-input: #0f172a;
+            --text-primary: #f8fafc;
+            --text-secondary: #94a3b8;
+            --text-muted: #64748b;
+            --accent-color: #3b82f6;
+            --accent-gradient: linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%);
+            --border-color: #334155;
+            --border-focus: #60a5fa;
+            --font-main: 'Inter', 'Noto Sans KR', sans-serif;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            background-color: var(--bg-base);
+            color: var(--text-primary);
+            font-family: var(--font-main);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            overflow: hidden;
+            margin: 0;
+            padding: 0;
+        }
+
+        /* 화면을 가득 채우는 컨테이너 */
+        .workspace-wrapper {
+            width: 100vw;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            background-color: var(--bg-surface);
+            overflow: hidden;
+        }
+
+        /* 상단 헤더 영역 */
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 16px 24px;
+            background-color: rgba(30, 41, 59, 0.7);
+            backdrop-filter: blur(8px);
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .logo-area {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .logo-icon {
+            width: 24px;
+            height: 24px;
+            background: var(--accent-gradient);
+            border-radius: 6px;
+        }
+
+        h1 {
+            font-size: 1.1rem;
+            font-weight: 600;
+            letter-spacing: -0.025em;
+            background: var(--accent-gradient);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        /* 3분할 그리드 레이아웃 (3:4:3 비율) */
+        .grid-container {
+            display: grid;
+            grid-template-columns: 3fr 4fr 3fr;
+            flex: 1;
+            overflow: hidden;
+            background-color: var(--border-color);
+            gap: 0; /* 테두리를 직접 그려 경계 구분 */
+        }
+
+        /* 각 패널 디자인 */
+        .panel {
+            display: flex;
+            flex-direction: column;
+            background-color: var(--bg-surface);
+            overflow: hidden;
+            height: 100%;
+            border-right: 4px solid var(--border-color); /* 창의 우측 경계선을 두껍게 */
+            position: relative; /* absolute 포지셔닝 인디케이터 배치를 위해 추가 */
+        }
+
+        /* 패널 헤더 (컨트롤러 영역) */
+        .panel-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px 16px;
+            background-color: rgba(15, 23, 42, 0.3);
+            border-bottom: 1px solid var(--border-color);
+            min-height: 48px;
+        }
+
+        .panel-title {
+            font-size: 0.85rem;
+            font-weight: 600;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        /* 패널 액션 그룹 */
+        .panel-action-group {
+            display: flex;
+            gap: 6px;
+            align-items: center;
+        }
+
+        /* 개별 파일 불러오기/저장 버튼 스타일링 (아이콘만 남김) */
+        .file-action-btn {
+            background-color: var(--bg-element);
+            color: var(--text-primary);
+            border: 1px solid var(--border-color);
+            width: 32px;
+            height: 32px;
+            font-size: 1rem;
+            border-radius: 6px;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s ease;
+            padding: 0;
+            user-select: none;
+        }
+
+        .file-action-btn:hover {
+            background-color: var(--accent-color);
+            border-color: var(--accent-color);
+        }
+
+        .file-action-btn input[type="file"] {
+            display: none;
+        }
+
+        /* 뷰 모드 토글 스위치 (Plain / Markdown) */
+        .view-toggle {
+            display: flex;
+            background-color: var(--bg-base);
+            padding: 3px;
+            border-radius: 8px;
+            border: 1px solid var(--border-color);
+        }
+
+        .toggle-btn {
+            background: none;
+            border: none;
+            color: var(--text-secondary);
+            font-size: 0.75rem;
+            font-weight: 500;
+            padding: 4px 10px;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .toggle-btn.active {
+            background-color: var(--bg-element);
+            color: var(--text-primary);
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+        }
+
+        /* 패널 본문 영역 */
+        .panel-body {
+            flex: 1;
+            position: relative;
+            overflow: hidden;
+        }
+
+        /* 블록 에디터 스크롤 컨테이너 */
+        .block-editor-container {
+            width: 100%;
+            height: 100%;
+            overflow-y: auto; /* 개별 블록이 아닌 전체 패널 단위로 표준 스크롤 수행 */
+            position: relative;
+            padding: 20px;
+            box-sizing: border-box;
+            scrollbar-width: thin;
+        }
+
+        /* 개별 단락 셀 블록 행 */
+        .editor-block-row {
+            position: relative;
+            width: 100%;
+            display: flex;
+            margin-bottom: 24px; /* 가로 구분 점선 공간 확보 */
+            border-bottom: 2px dashed rgba(59, 130, 246, 0.15); /* 셀 구분선 가로 점선화 */
+            padding-bottom: 12px;
+            box-sizing: border-box;
+        }
+
+        /* 블록 내 텍스트 에디터 */
+        .block-textarea {
+            flex: 1;
+            background-color: transparent;
+            border: none;
+            resize: none;
+            color: var(--text-primary);
+            font-family: var(--font-main);
+            font-size: 0.95rem;
+            line-height: 1.6;
+            outline: none;
+            display: block;
+            overflow: hidden; /* 내부 스크롤바 제거 (전체 스크롤 일치를 위함) */
+            padding: 0;
+            margin-right: 32px; /* 우측 인디케이터 및 스크롤바와 여백 확보 */
+            box-sizing: border-box;
+        }
+
+        /* 개별 셀 우측 채색 경계 세그먼트 (will-change 및 하드웨어 GPU 가속 최적화) */
+        .block-border-segment {
+            position: absolute;
+            right: 0; /* 스크롤바 왼쪽 예쁜 여백 위치에 자동 안착 */
+            top: 0;
+            bottom: 12px; /* 가로 구분선 직전까지 */
+            width: 16px; /* 두께 16px 고정 */
+            cursor: pointer;
+            border-radius: 4px; /* 둥근 라운드 약 적용 */
+            opacity: 0.85;
+            transition: opacity 0.15s ease, box-shadow 0.15s ease;
+            z-index: 5;
+            will-change: opacity, box-shadow;
+        }
+
+        .block-border-segment:hover {
+            opacity: 1;
+            box-shadow: 0 0 10px currentColor;
+        }
+
+        /* 세그먼트 3색 순환 배경 */
+        .block-border-segment.seg-red {
+            background-color: rgba(239, 68, 68, 0.85);
+            color: #ef4444;
+        }
+        .block-border-segment.seg-blue {
+            background-color: rgba(59, 130, 246, 0.85);
+            color: #3b82f6;
+        }
+        .block-border-segment.seg-yellow {
+            background-color: rgba(234, 179, 8, 0.85);
+            color: #eab308;
+        }
+
+        /* 마크다운 프리뷰 영역 */
+        .preview-area {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            padding: 20px;
+            overflow-y: auto;
+            display: none; /* 기본적으로 비활성화 */
+            line-height: 1.6;
+            font-size: 0.95rem;
+            scrollbar-width: thin;
+            scrollbar-color: var(--border-color) transparent;
+        }
+
+        /* 마크다운 렌더링 스타일 */
+        .preview-area h1, .preview-area h2, .preview-area h3 {
+            margin-top: 1em;
+            margin-bottom: 0.5em;
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+        .preview-area h1 { font-size: 1.5rem; border-bottom: 1px solid var(--border-color); padding-bottom: 0.3em; }
+        .preview-area h2 { font-size: 1.25rem; }
+        .preview-area h3 { font-size: 1.1rem; }
+        
+        .preview-area p {
+            margin-bottom: 1em;
+            color: #cbd5e1;
+        }
+
+        .preview-area code {
+            font-family: monospace;
+            background-color: var(--bg-base);
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-size: 0.85rem;
+            color: #f43f5e;
+        }
+
+        .preview-area pre {
+            background-color: var(--bg-base);
+            padding: 16px;
+            border-radius: 8px;
+            overflow-x: auto;
+            margin-bottom: 1em;
+            border: 1px solid var(--border-color);
+        }
+
+        .preview-area pre code {
+            background-color: transparent;
+            padding: 0;
+            color: #e2e8f0;
+        }
+
+        .preview-area ul, .preview-area ol {
+            margin-bottom: 1em;
+            padding-left: 20px;
+            color: #cbd5e1;
+        }
+
+        .preview-area li {
+            margin-bottom: 0.25em;
+        }
+
+        .preview-area blockquote {
+            border-left: 4px solid var(--accent-color);
+            padding-left: 16px;
+            margin-bottom: 1em;
+            color: var(--text-secondary);
+            font-style: italic;
+        }
+
+        /* 스크롤바 디자인 */
+        ::-webkit-scrollbar {
+            width: 16px; /* 두께 16px 고정 */
+            height: 16px;
+        }
+        ::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: var(--border-color);
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: var(--bg-element);
+        }
+
+        /* 활성화/비활성화 클래스 */
+        .view-active {
+            display: block !important;
+        }
+        .view-hidden {
+            display: none !important;
+        }
+
+        /* 헤더 컨트롤 영역 */
+        .header-controls {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+
+        /* 스크롤 동기화 버튼 */
+        .scroll-sync-btn {
+            background-color: var(--bg-element);
+            color: var(--text-secondary);
+            border: 1px solid var(--border-color);
+            padding: 6px 14px;
+            font-size: 0.8rem;
+            font-weight: 500;
+            border-radius: 8px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            transition: all 0.2s ease;
+        }
+
+        .scroll-sync-btn:hover {
+            background-color: var(--border-color);
+            color: var(--text-primary);
+        }
+
+        .scroll-sync-btn.active {
+            background-color: rgba(59, 130, 246, 0.15);
+            border-color: var(--accent-color);
+            color: #60a5fa;
+            box-shadow: 0 0 12px rgba(59, 130, 246, 0.2);
+        }
+
+        /* 헤더 액션 버튼 (전체 저장) */
+        .header-action-btn {
+            background: var(--accent-gradient);
+            color: var(--text-primary);
+            border: none;
+            padding: 6px 14px;
+            font-size: 0.8rem;
+            font-weight: 600;
+            border-radius: 8px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+            transition: all 0.2s ease;
+        }
+
+        .header-action-btn:hover {
+            opacity: 0.9;
+            transform: translateY(-1px);
+        }
+
+        /* 마크다운 셀 구분선 */
+        .cell-divider {
+            border-top: 1px dashed var(--accent-color);
+            margin: 24px 0;
+            opacity: 0.5;
+            position: relative;
+            height: 1px;
+        }
+        .cell-divider::after {
+            content: 'CELL BOUNDARY';
+            position: absolute;
+            top: -8px;
+            right: 16px;
+            background-color: var(--bg-surface);
+            padding: 0 8px;
+            font-size: 0.65rem;
+            color: var(--accent-color);
+            letter-spacing: 0.05em;
+            font-weight: 600;
+        }
+
+        .preview-cell {
+            position: relative; /* 화살표 배치의 기준 */
+            padding: 16px;
+            margin: 8px 0;
+            border-radius: 8px;
+            transition: background-color 0.2s ease;
+        }
+
+        /* 셀 구분을 위한 순환 색상 스타일 (빨강 -> 파랑 -> 노랑) */
+        .preview-cell.cell-red {
+            background-color: rgba(239, 68, 68, 0.04);
+            border-left: 4px solid rgba(239, 68, 68, 0.5);
+        }
+        .preview-cell.cell-red:hover {
+            background-color: rgba(239, 68, 68, 0.07);
+        }
+
+        .preview-cell.cell-blue {
+            background-color: rgba(59, 130, 246, 0.04);
+            border-left: 4px solid rgba(59, 130, 246, 0.5);
+        }
+        .preview-cell.cell-blue:hover {
+            background-color: rgba(59, 130, 246, 0.07);
+        }
+
+        .preview-cell.cell-yellow {
+            background-color: rgba(234, 179, 8, 0.04);
+            border-left: 4px solid rgba(234, 179, 8, 0.5);
+        }
+        .preview-cell.cell-yellow:hover {
+            background-color: rgba(234, 179, 8, 0.07);
+        }
+
+        /* 블록 로딩 오버레이 & 작업 중단 버튼 */
+        .block-loading-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: calc(100% - 12px); /* 가로 구분선 직전까지 */
+            background-color: rgba(15, 23, 42, 0.75);
+            backdrop-filter: blur(2px);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 12px;
+            z-index: 15;
+            border-radius: 6px;
+            border: 1.5px solid var(--accent-color);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+        }
+
+        .loading-text-container {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 0.85rem;
+            color: var(--text-primary);
+            font-weight: 500;
+        }
+
+        .cancel-action-btn {
+            background-color: #ef4444;
+            color: white;
+            border: none;
+            padding: 5px 10px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: background-color 0.15s ease;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+        }
+
+        .cancel-action-btn:hover {
+            background-color: #dc2626;
+        }
+
+        .spinner-icon {
+            width: 14px;
+            height: 14px;
+            border: 2px solid var(--text-primary);
+            border-top-color: transparent;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+    </style>
+</head>
+<body>
+
+    <div class="workspace-wrapper">
+        <!-- 상단 헤더 -->
+        <header>
+            <div class="logo-area">
+                <div class="logo-icon"></div>
+                <h1>triple</h1>
+            </div>
+            <div class="header-controls">
+                <button class="scroll-sync-btn" id="btn-reset-all" title="앱의 모든 데이터를 삭제하고 초기화합니다.">
+                    🔄 새로고침
+                </button>
+                <button class="header-action-btn" id="btn-summary-md" title="요약문만 옵시디언 MD 파일로 저장" style="font-size: 0.75rem; font-weight: bold; width: auto; padding: 0 8px; margin-right: 4px; background-color: var(--accent-color); color: white; border: none; border-radius: 4px; height: 32px; cursor: pointer;">
+                    결과물통합(md)
+                </button>
+                <button class="scroll-sync-btn active" id="btn-scroll-sync">
+                    🔗 스크롤 연동 켜짐
+                </button>
+                <button class="header-action-btn" id="btn-save-all" title="세 창의 모든 텍스트를 하나의 파일로 저장합니다.">
+                    💾 전체 저장
+                </button>
+                <button class="scroll-sync-btn" id="btn-load-project" title="전체 저장된 Triple 파일을 불러와 복원합니다.">
+                    📂 Triple 불러오기
+                </button>
+            </div>
+        </header>
+
+        <!-- 3분할 영역 -->
+        <div class="grid-container">
+            
+            <!-- 왼쪽: 외국어 텍스트 (원문) -->
+            <div class="panel" id="panel-source">
+                <div class="panel-header">
+                    <div class="panel-title">
+                        <span>원문 (Foreign Text)</span>
+                        <div class="panel-action-group">
+                            <label class="file-action-btn" id="upload-label-source" title="파일 불러오기">
+                                📂
+                                <input type="file" id="file-input-source" accept=".txt,.md">
+                            </label>
+                            <button class="file-action-btn" id="save-btn-source" title="원문 텍스트 저장">💾</button>
+                        </div>
+                    </div>
+                    <div class="view-toggle" data-panel="source">
+                        <button class="toggle-btn active" data-mode="plain">Plain</button>
+                        <button class="toggle-btn" data-mode="markdown">Markdown</button>
+                    </div>
+                </div>
+                <div class="panel-body">
+                    <div class="block-editor-container view-active" id="source-block-container"></div>
+                    <div class="preview-area view-hidden" id="source-preview"></div>
+                </div>
+            </div>
+
+            <!-- 가운데: 번역 결과 -->
+            <div class="panel" id="panel-translation">
+                <div class="panel-header">
+                    <div class="panel-title">
+                        <span>번역 결과 (Korean Translation)</span>
+                        <div class="panel-action-group">
+                            <select id="select-translate-method" style="font-size: 0.75rem; height: 32px; padding: 0 4px; border: 1px solid #ccc; border-radius: 4px; background: white; cursor: pointer; margin-right: 4px;" title="번역 방식 선택">
+                                <option value="ollama">Ollama (로컬)</option>
+                                <option value="deepl">DeepL API</option>
+                            </select>
+                            <input type="password" id="input-deepl-key" placeholder="DeepL Key 입력" style="display: none; font-size: 0.75rem; height: 30px; width: 110px; padding: 0 6px; border: 1px solid #ccc; border-radius: 4px; margin-right: 4px;" title="DeepL API Key">
+                            <button class="file-action-btn" id="btn-translate-all" title="원문 전체 번역" style="font-size: 0.75rem; padding: 0 8px; display: inline-flex; align-items: center; gap: 4px; font-weight: bold; background-color: var(--accent-color); color: white; border: none; border-radius: 4px; cursor: pointer; margin-right: 4px; width: auto; height: 32px;">
+                                🌐 전체 번역
+                            </button>
+                            <label class="file-action-btn" id="upload-label-translation" title="파일 불러오기">
+                                📂
+                                <input type="file" id="file-input-translation" accept=".txt,.md">
+                            </label>
+                            <button class="file-action-btn" id="save-btn-translation" title="번역문 텍스트 저장">💾</button>
+                        </div>
+                    </div>
+                    <div class="view-toggle" data-panel="translation">
+                        <button class="toggle-btn active" data-mode="plain">Plain</button>
+                        <button class="toggle-btn" data-mode="markdown">Markdown</button>
+                    </div>
+                </div>
+                <div class="panel-body">
+                    <div class="block-editor-container view-active" id="translation-block-container"></div>
+                    <div class="preview-area view-hidden" id="translation-preview"></div>
+                </div>
+            </div>
+
+            <!-- 오른쪽: 요약문 -->
+            <div class="panel" id="panel-summary">
+                <div class="panel-header">
+                    <div class="panel-title">
+                        <span>요약 (Summary)</span>
+                        <div class="panel-action-group">
+                            <select id="select-summarize-method" style="font-size: 0.75rem; height: 32px; padding: 0 4px; border: 1px solid #ccc; border-radius: 4px; background: white; cursor: pointer; margin-right: 4px;" title="요약 방식 선택">
+                                <option value="ollama">Ollama (로컬)</option>
+                                <option value="gemini">Gemini 3.5 Flash</option>
+                            </select>
+                            <input type="password" id="input-gemini-key" placeholder="Gemini Key 입력" style="display: none; font-size: 0.75rem; height: 30px; width: 110px; padding: 0 6px; border: 1px solid #ccc; border-radius: 4px; margin-right: 4px;" title="Gemini API Key">
+                            <button class="file-action-btn" id="btn-summarize-all" title="번역문 전체 요약" style="font-size: 0.75rem; padding: 0 8px; display: inline-flex; align-items: center; gap: 4px; font-weight: bold; background-color: var(--accent-color); color: white; border: none; border-radius: 4px; cursor: pointer; margin-right: 4px; width: auto; height: 32px;">
+                                📝 전체 요약
+                            </button>
+                            <label class="file-action-btn" id="upload-label-summary" title="파일 불러오기">
+                                📂
+                                <input type="file" id="file-input-summary" accept=".txt,.md">
+                            </label>
+                            <button class="file-action-btn" id="save-btn-summary" title="요약문 텍스트 저장">💾</button>
+                        </div>
+                    </div>
+                    <div class="view-toggle" data-panel="summary">
+                        <button class="toggle-btn active" data-mode="plain">Plain</button>
+                        <button class="toggle-btn" data-mode="markdown">Markdown</button>
+                    </div>
+                </div>
+                <div class="panel-body">
+                    <div class="block-editor-container view-active" id="summary-block-container"></div>
+                    <div class="preview-area view-hidden" id="summary-preview"></div>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <script>
+        // 각 패널별 에디터 및 프리뷰 엘리먼트 관리 객체
+        const panels = {
+            source: {
+                container: document.getElementById('source-block-container'),
+                preview: document.getElementById('source-preview')
+            },
+            translation: {
+                container: document.getElementById('translation-block-container'),
+                preview: document.getElementById('translation-preview')
+            },
+            summary: {
+                container: document.getElementById('summary-block-container'),
+                preview: document.getElementById('summary-preview')
+            }
+        };
+
+        // 파일 불러오기 설정
+        const fileInputs = {
+            source: document.getElementById('file-input-source'),
+            translation: document.getElementById('file-input-translation'),
+            summary: document.getElementById('file-input-summary')
+        };
+
+        Object.keys(fileInputs).forEach(panelKey => {
+            const inputEl = fileInputs[panelKey];
+            if (!inputEl) return;
+
+            inputEl.addEventListener('change', function(e) {
+                const file = e.target.files[0];
+                if (!file) return;
+
+                const reader = new FileReader();
+                reader.onload = function(event) {
+                    setPanelText(panelKey, event.target.result);
+                };
+                reader.readAsText(file, 'UTF-8');
+            });
+        });
+
+        // ----------------------------------------------------------------------
+        // 블록 에디터 텍스트 결합 & 렌더링 동기화 코어
+        // ----------------------------------------------------------------------
+
+        // 패널 내 모든 블록 텍스트를 하나로 합침
+        function getPanelText(panelKey) {
+            const container = panels[panelKey].container;
+            if (!container) return "";
+            const textareas = container.querySelectorAll('.block-textarea');
+            const values = Array.from(textareas).map(ta => ta.value);
+            return values.join("\n\n\n");
+        }
+
+        // 패널 텍스트 설정 및 블록화
+        function setPanelText(panelKey, rawText) {
+            let newCells = [];
+            if (rawText && rawText.trim() !== '') {
+                newCells = rawText.split(/(?:\r?\n[ \t]*){3,}/);
+            }
+            if (newCells.length === 0) {
+                newCells = [""];
+            }
+
+            // 1. 기존 데이터 백업
+            const backup = { source: [], translation: [], summary: [] };
+            let existingCellCount = 0;
+            
+            Object.keys(panels).forEach(key => {
+                const container = panels[key].container;
+                if (container) {
+                    const textareas = container.querySelectorAll('.block-textarea');
+                    existingCellCount = Math.max(existingCellCount, textareas.length);
+                    backup[key] = Array.from(textareas).map(ta => ta.value);
+                }
+            });
+
+            // 2. 최종 셀 개수 결정 (새로 불러온 단락 수와 기존 셀 개수 중 최대값)
+            const finalCellCount = Math.max(newCells.length, existingCellCount);
+
+            // 3. 모든 패널을 동기화하여 동적으로 재생성
+            Object.keys(panels).forEach(key => {
+                const container = panels[key].container;
+                if (!container) return;
+
+                container.innerHTML = '';
+                
+                for (let idx = 0; idx < finalCellCount; idx++) {
+                    let content = "";
+                    if (key === panelKey) {
+                        // 현재 파일을 불러온 패널: 새 데이터 반영 (새 데이터 범위를 초과하는 인덱스는 빈칸)
+                        content = (idx < newCells.length) ? newCells[idx] : "";
+                    } else {
+                        // 다른 패널: 기존에 있던 백업 데이터 복원 (기존 인덱스를 초과하는 경우에만 빈칸)
+                        content = (idx < backup[key].length) ? backup[key][idx] : "";
+                    }
+                    const row = createBlockRowDom(key, idx, content);
+                    container.appendChild(row);
+                }
+
+                updateMarkdownPreview(key);
+            });
+
+            reindexAllBlocks();
+            syncBlockHeights();
+        }
+
+        // 특정 셀의 텍스트만 찾아서 업데이트
+        function updatePanelCellText(panelKey, cellIdx, newText) {
+            const container = panels[panelKey].container;
+            if (!container) return;
+
+            const textareas = container.querySelectorAll('.block-textarea');
+            if (textareas[cellIdx]) {
+                textareas[cellIdx].value = newText;
+            } else {
+                // 인덱스가 없으면 순차적으로 채움
+                while (textareas.length <= cellIdx) {
+                    const row = createBlockRowDom(panelKey, textareas.length, "");
+                    container.appendChild(row);
+                }
+                const updatedTas = container.querySelectorAll('.block-textarea');
+                updatedTas[cellIdx].value = newText;
+            }
+
+            syncBlockHeights();
+            updateMarkdownPreview(panelKey);
+        }
+
+        // 개별 셀 블록 생성 (레거시 지원용)
+        function createBlockRow(panelKey, idx, content) {
+            const container = panels[panelKey].container;
+            if (!container) return;
+            const row = createBlockRowDom(panelKey, idx, content);
+            container.appendChild(row);
+        }
+
+        // DOM 객체 직접 생성기 (성능 최적화의 핵심 - re-render 방지)
+        function createBlockRowDom(panelKey, idx, content) {
+            const row = document.createElement('div');
+            row.className = 'editor-block-row';
+            row.setAttribute('data-block-index', idx);
+
+            const textarea = document.createElement('textarea');
+            textarea.className = 'block-textarea';
+            textarea.placeholder = panelKey === 'source' ? '여기에 외국어 텍스트를 직접 입력하거나 파일을 불러오세요...' :
+                                  panelKey === 'translation' ? '번역 결과가 여기에 표시되며 수정할 수 있습니다...' : '요약 내용이 여기에 표시됩니다...';
+            textarea.value = content;
+
+            const colorClasses = ['seg-red', 'seg-blue', 'seg-yellow'];
+            const colorClass = colorClasses[idx % 3];
+
+            const segment = document.createElement('div');
+            segment.className = `block-border-segment ${colorClass}`;
+            segment.title = `셀 ${idx + 1} 작업 처리 (원문 -> 번역 / 번역 -> 요약)`;
+
+            row.appendChild(textarea);
+            row.appendChild(segment);
+
+            // 이벤트 바인딩
+            bindBlockEvents(panelKey, row);
+            return row;
+        }
+
+        // 블록 이벤트 연결 (실시간 자동 높이 조절 및 3분할 돔 높이 동기화, 셀 나누기/합치기 포커스 제어 포함)
+        function bindBlockEvents(panelKey, row) {
+            const textarea = row.querySelector('.block-textarea');
+            const segment = row.querySelector('.block-border-segment');
+            const container = panels[panelKey].container;
+
+            // 내용 입력 시 실시간 정렬 및 프리뷰 갱신 (성능 최적화: requestAnimationFrame 활용 데드락 방지)
+            let animationFrameId = null;
+            textarea.addEventListener('input', () => {
+                if (animationFrameId) cancelAnimationFrame(animationFrameId);
+                animationFrameId = requestAnimationFrame(() => {
+                    syncBlockHeights();
+                    updateMarkdownPreview(panelKey);
+                });
+            });
+
+            // 키보드 네비게이션 & 셀 나누기/합치기 제어
+            textarea.addEventListener('keydown', (e) => {
+                const blockIdx = parseInt(row.getAttribute('data-block-index'), 10);
+
+                // 1. 엔터 3번 입력 시 셀 쪼개기
+                if (e.key === 'Enter') {
+                    const val = textarea.value;
+                    const selStart = textarea.selectionStart;
+                    const beforeText = val.substring(0, selStart);
+                    
+                    // 현재 입력 직전 텍스트가 줄바꿈 2개 연속(\n\n)이면 엔터를 더 칠 때 아래로 쪼갬
+                    if (beforeText.endsWith('\n\n')) {
+                        e.preventDefault();
+                        
+                        const currentText = beforeText.slice(0, -2);
+                        const nextText = val.substring(selStart);
+                        
+                        textarea.value = currentText;
+                        
+                        // 현재 패널에 셀 삽입 및 다른 패널에도 쌍둥이 공백 셀 동기화 생성
+                        insertBlockAt(panelKey, blockIdx + 1, nextText);
+                        
+                        // 포커스를 다음으로 이동
+                        setTimeout(() => {
+                            const nextRow = container.querySelector(`.editor-block-row[data-block-index="${blockIdx + 1}"]`);
+                            if (nextRow) {
+                                const nextTa = nextRow.querySelector('.block-textarea');
+                                nextTa.focus({ preventScroll: true });
+                                nextTa.setSelectionRange(0, 0);
+                            }
+                        }, 10);
+                        return;
+                    }
+                }
+
+                // 2. 백스페이스 맨 앞에서 누를 때 이전 블록과 병합
+                if (e.key === 'Backspace' && textarea.selectionStart === 0 && textarea.selectionEnd === 0) {
+                    if (blockIdx > 0) {
+                        e.preventDefault();
+                        const prevRow = container.querySelector(`.editor-block-row[data-block-index="${blockIdx - 1}"]`);
+                        const prevTa = prevRow.querySelector('.block-textarea');
+                        const prevLen = prevTa.value.length;
+                        
+                        prevTa.value += textarea.value;
+                        
+                        // 현재 패널 및 다른 패널 쌍둥이 셀 동시 삭제 병합
+                        removeBlockAt(panelKey, blockIdx);
+                        
+                        setTimeout(() => {
+                            prevTa.focus({ preventScroll: true });
+                            prevTa.setSelectionRange(prevLen, prevLen);
+                        }, 10);
+                        return;
+                    }
+                }
+
+                // 3. ArrowUp 맨 위 줄에서 이전 블록으로 커서 이동
+                if (e.key === 'ArrowUp') {
+                    const cursorLine = textarea.value.substring(0, textarea.selectionStart).split('\n').length - 1;
+                    if (cursorLine === 0 && blockIdx > 0) {
+                        e.preventDefault();
+                        const prevRow = container.querySelector(`.editor-block-row[data-block-index="${blockIdx - 1}"]`);
+                        const prevTa = prevRow.querySelector('.block-textarea');
+                        prevTa.focus({ preventScroll: true });
+                        const len = prevTa.value.length;
+                        prevTa.setSelectionRange(len, len);
+                    }
+                }
+
+                // 4. ArrowDown 맨 아래 줄에서 다음 블록으로 커서 이동
+                if (e.key === 'ArrowDown') {
+                    const cursorLine = textarea.value.substring(0, textarea.selectionStart).split('\n').length - 1;
+                    const totalLines = textarea.value.split('\n').length - 1;
+                    const rowCount = container.querySelectorAll('.editor-block-row').length;
+                    if (cursorLine === totalLines && blockIdx < rowCount - 1) {
+                        e.preventDefault();
+                        const nextRow = container.querySelector(`.editor-block-row[data-block-index="${blockIdx + 1}"]`);
+                        const nextTa = nextRow.querySelector('.block-textarea');
+                        nextTa.focus({ preventScroll: true });
+                        nextTa.setSelectionRange(0, 0);
+                    }
+                }
+            });
+
+            segment.addEventListener('click', () => {
+                const blockIdx = parseInt(row.getAttribute('data-block-index'), 10);
+                handleCellAction(panelKey, blockIdx);
+            });
+        }
+
+        // 인덱스 갱신 및 색상 정렬 일관성 부여 (성능 최적화)
+        function reindexAllBlocks() {
+            const colorClasses = ['seg-red', 'seg-blue', 'seg-yellow'];
+            Object.keys(panels).forEach(key => {
+                const container = panels[key].container;
+                const rows = container.querySelectorAll('.editor-block-row');
+                rows.forEach((row, idx) => {
+                    row.setAttribute('data-block-index', idx);
+                    const segment = row.querySelector('.block-border-segment');
+                    if (segment) {
+                        segment.className = `block-border-segment ${colorClasses[idx % 3]}`;
+                        segment.title = `셀 ${idx + 1} 작업 처리 (원문 -> 번역 / 번역 -> 요약)`;
+                    }
+                });
+            });
+        }
+
+        // 동적 쌍둥이 블록 정렬 동기화 생성 (성능 최적화: innerHTML을 비우지 않고 DOM 직접 조작)
+        function insertBlockAt(panelKey, targetIdx, content) {
+            isSyncingLayout = true;
+            // 쪼개기 전 각 패널의 스크롤 위치 저장
+            const scrollPositions = {};
+            Object.keys(panels).forEach(key => {
+                scrollPositions[key] = panels[key].container.scrollTop;
+            });
+
+            Object.keys(panels).forEach(key => {
+                const container = panels[key].container;
+                const insertVal = (key === panelKey) ? content : "";
+                
+                // 새 DOM 객체 생성 및 특정 인덱스 위치에 꽂아 넣음
+                const newRow = createBlockRowDom(key, targetIdx, insertVal);
+                const rows = container.querySelectorAll('.editor-block-row');
+                
+                if (targetIdx < rows.length) {
+                    container.insertBefore(newRow, rows[targetIdx]);
+                } else {
+                    container.appendChild(newRow);
+                }
+
+                updateMarkdownPreview(key);
+            });
+
+            reindexAllBlocks();
+            syncBlockHeights();
+
+            // 스크롤 위치 완벽 복구
+            Object.keys(panels).forEach(key => {
+                panels[key].container.scrollTop = scrollPositions[key];
+            });
+
+            setTimeout(() => {
+                isSyncingLayout = false;
+            }, 0);
+        }
+
+        // 동적 쌍둥이 블록 동시 삭제 (성능 최적화: DOM 직접 제거)
+        function removeBlockAt(panelKey, targetIdx) {
+            isSyncingLayout = true;
+            // 삭제 전 스크롤 위치 저장
+            const scrollPositions = {};
+            Object.keys(panels).forEach(key => {
+                scrollPositions[key] = panels[key].container.scrollTop;
+            });
+
+            Object.keys(panels).forEach(key => {
+                const container = panels[key].container;
+                const rows = container.querySelectorAll('.editor-block-row');
+                if (rows[targetIdx]) {
+                    rows[targetIdx].remove();
+                }
+                
+                updateMarkdownPreview(key);
+            });
+
+            reindexAllBlocks();
+            syncBlockHeights();
+
+            // 스크롤 위치 완벽 복구
+            Object.keys(panels).forEach(key => {
+                panels[key].container.scrollTop = scrollPositions[key];
+            });
+
+            setTimeout(() => {
+                isSyncingLayout = false;
+            }, 0);
+        }
+
+        // 3분할 쌍둥이 셀들의 상하 높이 정렬 (Batch Read-Write 최적화로 레이아웃 스래싱을 원천 제거)
+        function syncBlockHeights() {
+            const wasSyncing = isSyncingLayout;
+            isSyncingLayout = true;
+
+            const scrollPositions = {};
+            Object.keys(panels).forEach(key => {
+                scrollPositions[key] = panels[key].container.scrollTop;
+            });
+
+            const sourceBlocks = panels.source.container.querySelectorAll('.editor-block-row');
+            const translationBlocks = panels.translation.container.querySelectorAll('.editor-block-row');
+            const summaryBlocks = panels.summary.container.querySelectorAll('.editor-block-row');
+
+            const maxCount = Math.max(sourceBlocks.length, translationBlocks.length, summaryBlocks.length);
+
+            // 1단계 (Batch Write): 모든 타겟 textarea들의 높이를 'auto'로 일괄 변경
+            const rowsData = [];
+            for (let i = 0; i < maxCount; i++) {
+                const sTa = sourceBlocks[i] ? sourceBlocks[i].querySelector('.block-textarea') : null;
+                const tTa = translationBlocks[i] ? translationBlocks[i].querySelector('.block-textarea') : null;
+                const sumTa = summaryBlocks[i] ? summaryBlocks[i].querySelector('.block-textarea') : null;
+                
+                const tas = [sTa, tTa, sumTa].filter(Boolean);
+                tas.forEach(ta => {
+                    ta.style.height = 'auto';
+                });
+                rowsData.push({ tas });
+            }
+
+            // 2단계 (Batch Read): 모든 셀들의 scrollHeight를 일괄 수집 (브라우저가 렌더 트리를 단 1번만 계산)
+            const heightsData = rowsData.map(row => {
+                return row.tas.map(ta => ta.scrollHeight);
+            });
+
+            // 3단계 (Batch Write): 각각 측정된 최고값(Max Height)을 일괄 할당
+            for (let i = 0; i < maxCount; i++) {
+                const row = rowsData[i];
+                const heights = heightsData[i];
+                const maxHeight = heights.length > 0 ? Math.max(...heights) : 40;
+                
+                row.tas.forEach(ta => {
+                    ta.style.height = maxHeight + 'px';
+                });
+            }
+
+            // 스크롤 위치 완벽 복구
+            Object.keys(panels).forEach(key => {
+                panels[key].container.scrollTop = scrollPositions[key];
+            });
+
+            if (!wasSyncing) {
+                setTimeout(() => {
+                    isSyncingLayout = false;
+                }, 0);
+            }
+        }
+
+        // 로컬 LLM의 사고 과정(Thinking Process) 태그를 프론트엔드에서도 정제하는 헬퍼 함수
+        function cleanThinkingProcess(text) {
+            if (!text) return "";
+            // <|channel>thought ... <channel|> 또는 </channel|> 패턴 제거 (Gemma4 IT 등)
+            text = text.replace(/<\|channel>thought[\s\S]*?<\/?channel\|>/g, '');
+            // <think> ... </think> 패턴 제거 (DeepSeek R1 등)
+            text = text.replace(/<think>[\s\S]*?<\/think>/g, '');
+            return text.trim();
+        }
+
+        // Ollama API 비동기 번역 통신 함수
+        async function translateTextWithOllama(text) {
+            const model = "hf.co/lmstudio-community/gemma-4-E4B-it-GGUF:Q4_K_M";
+            const systemPrompt = "You are a professional English-to-Korean translator. Translate the target English text into clear Korean. Use formal plain style (~이다, ~한다). Output ONLY the translation without any introduction or conversational notes.";
+            const prompt = `<start_of_turn>system\n${systemPrompt}<end_of_turn>\n<start_of_turn>user\n${text}<end_of_turn>\n<start_of_turn>model\n`;
+
+            const response = await fetch("http://127.0.0.1:11434/api/generate", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    model: model,
+                    prompt: prompt,
+                    stream: false,
+                    options: { 
+                        temperature: 0.2,
+                        num_ctx: 4096,
+                        num_predict: 4096
+                    }
+                })
+            });
+            if (!response.ok) throw new Error("Ollama translation error");
+            const data = await response.json();
+            return cleanThinkingProcess(data.response.trim());
+        }
+
+        // Ollama API 비동기 요약 통신 함수
+        async function summarizeTextWithOllama(text) {
+            const model = "hf.co/lmstudio-community/gemma-4-E4B-it-GGUF:Q4_K_M";
+            const systemPrompt = "다음 한국어 텍스트를 핵심 내용 위주로 요약하되, 반드시 첫 줄은 '제목: [한 줄 제목]'으로 작성하고, 그 다음 줄에는 접두사 없이 한 문장의 짧은 요약 내용만 작성하시오. 키워드나 '요약:'과 같은 말은 절대로 쓰지 마시오.";
+            const prompt = `<start_of_turn>system\n${systemPrompt}<end_of_turn>\n<start_of_turn>user\n${text}<end_of_turn>\n<start_of_turn>model\n`;
+
+            const response = await fetch("http://127.0.0.1:11434/api/generate", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    model: model,
+                    prompt: prompt,
+                    stream: false,
+                    options: { 
+                        temperature: 0.3,
+                        num_ctx: 4096,
+                        num_predict: 4096
+                    }
+                })
+            });
+            if (!response.ok) throw new Error("Ollama summary error");
+            const data = await response.json();
+            return cleanThinkingProcess(data.response.trim());
+        }
+
+        // API 비가동 시 데모용 고품질 Mock 번역
+        function mockTranslate(text, cellIdx) {
+            const sentences = text.split(/[.!?]/).filter(s => s.trim().length > 0);
+            const mockKors = [
+                "이 시스템은 세 가지 창(원문, 번역문, 요약문)을 사용하여 효율적인 번역 작업을 지원합니다.",
+                "인공지능 모델을 활용하여 전문 용어 사전을 기반으로 맥락에 어긋나지 않는 번역을 생성하는 프로세스이다.",
+                "사용자가 편집창에서 텍스트를 변경하면 실시간으로 오버레이 경계선과 가로 점선이 갱신됩니다.",
+                "세그먼트 경계선을 클릭하면 해당 셀의 내용만을 즉시 인접한 패널로 번역하거나 요약하도록 요청할 수 있다.",
+                "다크 모드로 구현된 미려한 사용자 인터페이스는 긴 시간의 작업 환경에서도 눈의 피로를 최소화합니다."
+            ];
+            
+            let result = "";
+            if (sentences.length > 0) {
+                result = sentences.map((s, i) => {
+                    const idx = (cellIdx + i) % mockKors.length;
+                    return mockKors[idx];
+                }).join(" ");
+            } else {
+                result = `[원문 셀 ${cellIdx + 1}의 번역 결과 예시 문장입니다. 로컬 Ollama API 서버가 켜져 있으면 실제 AI 번역이 여기에 채워집니다.]`;
+            }
+            return result;
+        }
+
+        // API 비가동 시 데모용 고품질 Mock 요약
+        function mockSummarize(text, cellIdx) {
+            return `제목: 실시간 요약 기능 데모\n본 시스템은 3분할 구조를 통해 실시간 번역과 요약을 동시 지원하는 편리한 문서 작업 도구이다.`;
+        }
+
+        // 로딩 오버레이 띄우기
+        function showLoadingOverlay(panelKey, cellIdx, taskId) {
+            const container = panels[panelKey].container;
+            const rows = container.querySelectorAll('.editor-block-row');
+            const row = rows[cellIdx];
+            if (!row) return;
+
+            // 이미 오버레이가 있다면 제거
+            hideLoadingOverlay(panelKey, cellIdx);
+
+            const overlay = document.createElement('div');
+            overlay.className = 'block-loading-overlay';
+            
+            const textContainer = document.createElement('div');
+            textContainer.className = 'loading-text-container';
+            
+            const spinner = document.createElement('div');
+            spinner.className = 'spinner-icon';
+            
+            const textNode = document.createTextNode(
+                panelKey === 'translation' ? '⏳ AI 번역 중...' : '⏳ AI 요약 중...'
+            );
+            
+            textContainer.appendChild(spinner);
+            textContainer.appendChild(textNode);
+            
+            const cancelBtn = document.createElement('button');
+            cancelBtn.className = 'cancel-action-btn';
+            cancelBtn.innerText = '중단';
+            
+            cancelBtn.addEventListener('click', async (e) => {
+                e.stopPropagation();
+                cancelBtn.disabled = true;
+                cancelBtn.innerText = '중단 중...';
+                if (window.pywebview && window.pywebview.api) {
+                    await window.pywebview.api.cancel_task(taskId);
+                }
+            });
+            
+            overlay.appendChild(textContainer);
+            overlay.appendChild(cancelBtn);
+            row.appendChild(overlay);
+        }
+
+        // 로딩 오버레이 제거
+        function hideLoadingOverlay(panelKey, cellIdx) {
+            const container = panels[panelKey].container;
+            const rows = container.querySelectorAll('.editor-block-row');
+            const row = rows[cellIdx];
+            if (!row) return;
+
+            const overlay = row.querySelector('.block-loading-overlay');
+            if (overlay) {
+                overlay.remove();
+            }
+        }
+
+        // 경계선 세그먼트 클릭에 따른 번역/요약 라우터
+        async function handleCellAction(panelKey, cellIdx) {
+            const container = panels[panelKey].container;
+            const textareas = container.querySelectorAll('.block-textarea');
+            const cellText = textareas[cellIdx] ? textareas[cellIdx].value.trim() : "";
+
+            if (!cellText) {
+                alert("번역/요약할 텍스트가 빈 셀입니다.");
+                return;
+            }
+
+            if (panelKey === 'source') {
+                // 대상이 되는 번역문 셀의 텍스트가 제외 키워드인지 먼저 체크
+                const transCells = panels.translation.container.querySelectorAll('.block-textarea');
+                const transVal = transCells[cellIdx] ? transCells[cellIdx].value.trim() : "";
+                if (transVal === '제외' || transVal === '번역제외' || transVal === '번역 제외') {
+                    updatePanelCellText('translation', cellIdx, cellText);
+                    return;
+                }
+
+                const taskId = `translate_${cellIdx}_${Date.now()}`;
+                // 번역문 패널의 동일 인덱스 셀(쌍둥이셀)에 로딩 표시 씌움 (기존 텍스트를 날리지 않음)
+                showLoadingOverlay('translation', cellIdx, taskId);
+                try {
+                    if (window.pywebview && window.pywebview.api) {
+                        const methodEl = document.getElementById('select-translate-method');
+                        const keyEl = document.getElementById('input-deepl-key');
+                        const method = methodEl ? methodEl.value : 'ollama';
+                        const apiKey = keyEl ? keyEl.value : '';
+                        
+                        const response = await window.pywebview.api.translate(cellText, method, apiKey, taskId);
+                        if (response && response.success) {
+                            updatePanelCellText('translation', cellIdx, response.result);
+                        } else {
+                            throw new Error(response ? response.error : "API 실패");
+                        }
+                    } else {
+                        const translated = await translateTextWithOllama(cellText);
+                        updatePanelCellText('translation', cellIdx, translated);
+                    }
+                } catch (err) {
+                    if (err.message && (err.message.includes("cancelled") || err.message.includes("cancelled by user") || err.message.includes("cancelled_task") || err.message.includes("User cancelled") || err.message.includes("cancelled by user") || err.message.includes("cancelled_task"))) {
+                        console.log("사용자에 의해 번역이 취소되었습니다.");
+                    } else {
+                        console.warn("AI 번역 실패, 데모 모드로 전환:", err);
+                        const mockText = mockTranslate(cellText, cellIdx);
+                        updatePanelCellText('translation', cellIdx, mockText);
+                    }
+                } finally {
+                    hideLoadingOverlay('translation', cellIdx);
+                }
+            } else if (panelKey === 'translation') {
+                // 대상이 되는 요약문 셀의 텍스트가 제외 키워드인지 먼저 체크
+                const summaryCells = panels.summary.container.querySelectorAll('.block-textarea');
+                const summaryVal = summaryCells[cellIdx] ? summaryCells[cellIdx].value.trim() : "";
+                if (summaryVal === '제외' || summaryVal === '요약제외' || summaryVal === '요약 제외') {
+                    updatePanelCellText('summary', cellIdx, cellText);
+                    return;
+                }
+
+                const taskId = `summarize_${cellIdx}_${Date.now()}`;
+                // 요약문 패널의 동일 인덱스 셀(쌍둥이셀)에 로딩 표시 씌움
+                showLoadingOverlay('summary', cellIdx, taskId);
+                try {
+                    // pywebview 파이썬 API 브릿지가 활성화되어 있으면 연동 호출
+                    if (window.pywebview && window.pywebview.api) {
+                        const methodEl = document.getElementById('select-summarize-method');
+                        const keyEl = document.getElementById('input-gemini-key');
+                        const method = methodEl ? methodEl.value : 'ollama';
+                        const apiKey = keyEl ? keyEl.value : '';
+
+                        const response = await window.pywebview.api.summarize(cellText, method, apiKey, taskId);
+                        if (response && response.success) {
+                            updatePanelCellText('summary', cellIdx, response.result);
+                        } else {
+                            throw new Error(response ? response.error : "API 실패");
+                        }
+                    } else {
+                        const summarized = await summarizeTextWithOllama(cellText);
+                        updatePanelCellText('summary', cellIdx, summarized);
+                    }
+                } catch (err) {
+                    if (err.message && (err.message.includes("cancelled") || err.message.includes("cancelled by user") || err.message.includes("cancelled_task") || err.message.includes("User cancelled") || err.message.includes("cancelled by user") || err.message.includes("cancelled_task"))) {
+                        console.log("사용자에 의해 요약이 취소되었습니다.");
+                    } else {
+                        console.warn("AI 요약 실패, 데모 모드로 전환:", err);
+                        const mockText = mockSummarize(cellText, cellIdx);
+                        updatePanelCellText('summary', cellIdx, mockText);
+                    }
+                } finally {
+                    hideLoadingOverlay('summary', cellIdx);
+                }
+            } else if (panelKey === 'summary') {
+                alert("요약 패널입니다. 원문 또는 번역문 경계선을 클릭해 보세요!");
+            }
+        }
+
+        // 마크다운 프리뷰 갱신 함수 (3개 이상의 줄바꿈을 기준으로 쪼개어 프리뷰 구성)
+        function updateMarkdownPreview(panelKey) {
+            const rawText = getPanelText(panelKey);
+            const previewEl = panels[panelKey].preview;
+            if (!rawText || rawText.trim() === '') {
+                previewEl.innerHTML = '';
+                return;
+            }
+
+            const cells = rawText.split(/(?:\r?\n[ \t]*){3,}/);
+            const colorClasses = ['cell-red', 'cell-blue', 'cell-yellow'];
+            let htmlContent = '';
+
+            cells.forEach((cell, idx) => {
+                const colorClass = colorClasses[idx % 3];
+                const parsedCell = marked.parse(cell || '');
+                htmlContent += `<div class="preview-cell ${colorClass}" data-cell-index="${idx}">${parsedCell}</div>`;
+                if (idx < cells.length - 1) {
+                    htmlContent += `<div class="cell-divider"></div>`;
+                }
+            });
+
+            previewEl.innerHTML = htmlContent;
+        }
+
+        // 에디터/프리뷰 보기 모드 토글 전환 핸들러
+        const toggleContainers = document.querySelectorAll('.view-toggle');
+        toggleContainers.forEach(container => {
+            const panelKey = container.getAttribute('data-panel');
+            const buttons = container.querySelectorAll('.toggle-btn');
+            
+            buttons.forEach(button => {
+                button.addEventListener('click', () => {
+                    const mode = button.getAttribute('data-mode');
+                    
+                    buttons.forEach(btn => btn.classList.remove('active'));
+                    button.classList.add('active');
+
+                    const blockContainer = panels[panelKey].container;
+                    const previewEl = panels[panelKey].preview;
+
+                    if (mode === 'plain') {
+                        blockContainer.classList.remove('view-hidden');
+                        blockContainer.classList.add('view-active');
+                        
+                        previewEl.classList.remove('view-active');
+                        previewEl.classList.add('view-hidden');
+
+                        // 전환 시 레이아웃 싱크
+                        syncBlockHeights();
+                    } else if (mode === 'markdown') {
+                        updateMarkdownPreview(panelKey);
+
+                        blockContainer.classList.remove('view-active');
+                        blockContainer.classList.add('view-hidden');
+                        
+                        previewEl.classList.remove('view-hidden');
+                        previewEl.classList.add('view-active');
+                    }
+                });
+            });
+        });
+
+        // ----------------------------------------------------------------------
+        // 스크롤 동기화(연동) 기능 구현 (절대값 기반)
+        // ----------------------------------------------------------------------
+        let isScrollSynced = true;
+        let activeScroller = null;
+        let isSyncingLayout = false; // 레이아웃 동기화 중 스크롤 튐 방지 플래그
+        const btnScrollSync = document.getElementById('btn-scroll-sync');
+
+        // 현재 활성화되어 눈에 보이는 영역 가져오기 (블록 컨테이너 혹은 프리뷰)
+        function getActiveScrollElement(panelKey) {
+            const panel = panels[panelKey];
+            return panel.container.classList.contains('view-active') ? panel.container : panel.preview;
+        }
+
+        // 스크롤 동기화 핸들러 (디바운스/쓰로틀 없이 Mouseenter 감지로 안전 연동)
+        function handleScroll(e) {
+            if (isSyncingLayout) return; // 레이아웃 변경 중 스크롤 동기화 방지
+            if (!isScrollSynced || activeScroller !== e.target) return;
+
+            const scroller = e.target;
+            const currentScrollTop = scroller.scrollTop;
+
+            Object.keys(panels).forEach(panelKey => {
+                const targetEl = getActiveScrollElement(panelKey);
+                if (targetEl === scroller) return;
+
+                targetEl.scrollTop = currentScrollTop;
+            });
+        }
+
+        // 각 패널(블록 컨테이너 및 프리뷰)에 이벤트 리스너 등록
+        Object.keys(panels).forEach(panelKey => {
+            const panel = panels[panelKey];
+            
+            [panel.container, panel.preview].forEach(el => {
+                el.addEventListener('mouseenter', () => {
+                    activeScroller = el;
+                });
+                el.addEventListener('scroll', handleScroll);
+            });
+        });
+
+        // 스크롤 연동 토글 이벤트
+        btnScrollSync.addEventListener('click', () => {
+            isScrollSynced = !isScrollSynced;
+
+            if (isScrollSynced) {
+                btnScrollSync.classList.add('active');
+                btnScrollSync.innerHTML = '🔗 스크롤 연동 켜짐';
+
+                // 연동 켜질 때 세 화면 모두 최상단으로 스크롤 정렬
+                Object.keys(panels).forEach(panelKey => {
+                    panels[panelKey].container.scrollTop = 0;
+                    panels[panelKey].preview.scrollTop = 0;
+                });
+            } else {
+                btnScrollSync.classList.remove('active');
+                btnScrollSync.innerHTML = '🔓 스크롤 연동 꺼짐';
+            }
+        });
+
+        // 브라우저 윈도우 크기 조절 시 레이아웃 갱신
+        window.addEventListener('resize', () => {
+            syncBlockHeights();
+        });
+
+        // 번역 방식 전환 이벤트 (Ollama vs. DeepL)
+        const selectTranslateMethod = document.getElementById('select-translate-method');
+        const inputDeeplKey = document.getElementById('input-deepl-key');
+        if (selectTranslateMethod && inputDeeplKey) {
+            selectTranslateMethod.addEventListener('change', () => {
+                if (selectTranslateMethod.value === 'deepl') {
+                    inputDeeplKey.style.display = 'inline-block';
+                } else {
+                    inputDeeplKey.style.display = 'none';
+                }
+            });
+        }
+
+        // 요약 방식 전환 이벤트 (Ollama vs. Gemini)
+        const selectSummarizeMethod = document.getElementById('select-summarize-method');
+        const inputGeminiKey = document.getElementById('input-gemini-key');
+        if (selectSummarizeMethod && inputGeminiKey) {
+            selectSummarizeMethod.addEventListener('change', () => {
+                if (selectSummarizeMethod.value === 'gemini') {
+                    inputGeminiKey.style.display = 'inline-block';
+                } else {
+                    inputGeminiKey.style.display = 'none';
+                }
+            });
+        }
+
+        // 새로고침 (초기화) 이벤트
+        const btnResetAll = document.getElementById('btn-reset-all');
+        btnResetAll.addEventListener('click', () => {
+            if (confirm("현재 작성 중인 모든 텍스트 데이터가 삭제됩니다. 정말 초기화하시겠습니까?")) {
+                setPanelText('source', '');
+                setPanelText('translation', '');
+                setPanelText('summary', '');
+            }
+        });
+
+        // 요약문만 추출하여 옵시디언 MD 파일로 저장
+        const btnSummaryMd = document.getElementById('btn-summary-md');
+        btnSummaryMd.addEventListener('click', async () => {
+            const sourceRows = panels.source.container.querySelectorAll('.editor-block-row');
+            const translationRows = panels.translation.container.querySelectorAll('.editor-block-row');
+            const summaryRows = panels.summary.container.querySelectorAll('.editor-block-row');
+            
+            const total = summaryRows.length;
+            if (total === 0) {
+                alert("저장할 요약 데이터가 없습니다.");
+                return;
+            }
+            
+            const mdTexts = [];
+            
+            for (let i = 0; i < total; i++) {
+                const sumRow = summaryRows[i];
+                const sumTa = sumRow ? sumRow.querySelector('.block-textarea') : null;
+                const sumVal = sumTa ? sumTa.value : "";
+                
+                let summaryPart = "";
+                
+                if (sumVal.trim()) {
+                    const lines = sumVal.split('\n');
+                    
+                    // 과거 레거시 형식 감지 ('키워드:'와 '요약:'이 동시에 있거나 '제목:'이 있는 경우)
+                    let hasKeywordMarker = false;
+                    let hasSummaryMarker = false;
+                    let hasTitleMarker = false;
+                    for (let j = 0; j < lines.length; j++) {
+                        const tr = lines[j].trim();
+                        if (tr.startsWith('키워드:')) hasKeywordMarker = true;
+                        if (tr.startsWith('요약:')) hasSummaryMarker = true;
+                        if (tr.startsWith('제목:')) hasTitleMarker = true;
+                    }
+                    
+                    const isLegacyFormat = (hasKeywordMarker && hasSummaryMarker) || hasTitleMarker;
+                    
+                    if (isLegacyFormat) {
+                        // 과거 형식인 경우 표지를 무시/삭제하고 알맹이만 파싱
+                        const titleLines = [];
+                        const bodyLines = [];
+                        
+                        for (let j = 0; j < lines.length; j++) {
+                            const line = lines[j];
+                            const trimmed = line.trim();
+                            
+                            if (trimmed.startsWith('제목:')) {
+                                const val = trimmed.substring(3).trim();
+                                if (val) titleLines.push(val);
+                                continue;
+                            }
+                            if (trimmed.startsWith('키워드:')) {
+                                continue;
+                            }
+                            if (trimmed.startsWith('요약:')) {
+                                const val = trimmed.substring(3).trim();
+                                if (val) bodyLines.push(val);
+                                continue;
+                            }
+                            bodyLines.push(line);
+                        }
+                        
+                        const titleText = titleLines.join('\n').trim();
+                        const summaryText = bodyLines.join('\n').trim();
+                        
+                        if (titleText) {
+                            summaryPart += (titleText.startsWith('#') ? titleText : `# ${titleText}`);
+                        }
+                        if (summaryText) {
+                            if (summaryPart) summaryPart += "\n";
+                            summaryPart += summaryText;
+                        }
+                    } else {
+                        // 최신 형식인 경우 표지를 따지지 않고 요약문 텍스트 전체를 그대로 사용
+                        summaryPart = sumVal.trim();
+                    }
+                }
+                
+                const transRow = translationRows[i];
+                const transTa = transRow ? transRow.querySelector('.block-textarea') : null;
+                const transVal = transTa ? transTa.value.trim() : "";
+                
+                const srcRow = sourceRows[i];
+                const srcTa = srcRow ? srcRow.querySelector('.block-textarea') : null;
+                const srcVal = srcTa ? srcTa.value.trim() : "";
+                
+                // 요약문, 번역문, 원문 내용이 모두 동일한지 체크 (표지가 지워진 실제 알맹이 내용인 summaryPart 기준 비교)
+                const isAllSame = (summaryPart.trim() !== "" && summaryPart.trim() === transVal && transVal === srcVal);
+
+                let blockContent = "";
+                if (isAllSame) {
+                    blockContent = summaryPart;
+                } else {
+                    const parts = [];
+                    if (summaryPart) parts.push(summaryPart);
+                    if (transVal) {
+                        parts.push(`<details style="margin-left: 24px;">\n<summary>번역문</summary>\n\n${transVal}\n\n</details>`);
+                    }
+                    if (srcVal) {
+                        parts.push(`<details style="margin-left: 24px;">\n<summary>원문</summary>\n\n${srcVal}\n\n</details>`);
+                    }
+                    blockContent = parts.join('\n');
+                }
+                
+                blockContent = blockContent.trim();
+                if (blockContent) {
+                    mdTexts.push(blockContent + '\n<br/>');
+                }
+            }
+            
+            if (mdTexts.length === 0) {
+                alert("저장할 요약 데이터가 없습니다.");
+                return;
+            }
+            
+            const fileContent = mdTexts.join('\n\n') + '\n\n';
+            const defaultName = 'summary.md';
+            
+            if (window.pywebview && window.pywebview.api) {
+                try {
+                    const response = await window.pywebview.api.save_file_dialog(defaultName, fileContent);
+                    if (response && response.success) {
+                        console.log("MD 파일 저장 성공:", response.path);
+                    } else if (response && response.cancelled) {
+                        console.log("MD 파일 저장 취소됨");
+                    } else {
+                        throw new Error(response ? response.error : "알 수 없는 오류");
+                    }
+                } catch (err) {
+                    alert("파일 저장 실패: " + err.message);
+                }
+            } else {
+                // 브라우저 데모용 Fallback 다운로드
+                const blob = new Blob([fileContent], { type: 'text/markdown;charset=utf-8;' });
+                const url = URL.createObjectURL(blob);
+                const link = document.createElement("a");
+                link.setAttribute("href", url);
+                link.setAttribute("download", defaultName);
+                link.style.visibility = 'hidden';
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+            }
+        });
+
+        // ----------------------------------------------------------------------
+        // 원문 전체 번역 (배치 처리) 기능 구현
+        // ----------------------------------------------------------------------
+        let isTranslatingAll = false;
+        let cancelTranslateAll = false;
+        const btnTranslateAll = document.getElementById('btn-translate-all');
+
+        async function translateAllBlocks() {
+            if (isTranslatingAll) {
+                // 이미 번역 중이면 중단 요청 설정
+                cancelTranslateAll = true;
+                btnTranslateAll.innerHTML = '⏳ 중단 대기 중...';
+                btnTranslateAll.disabled = true;
+                return;
+            }
+
+            const sourceRows = panels.source.container.querySelectorAll('.editor-block-row');
+            const total = sourceRows.length;
+            if (total === 0) {
+                alert("번역할 원문 셀이 없습니다.");
+                return;
+            }
+
+            isTranslatingAll = true;
+            cancelTranslateAll = false;
+            btnTranslateAll.style.backgroundColor = '#d32f2f'; // 중단 버튼 색상 (Red)
+            btnTranslateAll.innerHTML = '⏹️ 번역 중단';
+
+            const originalTitle = btnTranslateAll.title;
+            btnTranslateAll.title = "번역 작업을 중단하려면 클릭하세요.";
+
+            for (let i = 0; i < total; i++) {
+                if (cancelTranslateAll) {
+                    alert("원문 전체 번역 작업이 사용자에 의해 중단되었습니다.");
+                    break;
+                }
+
+                // 버튼 내 실시간 진척도 업데이트
+                btnTranslateAll.innerHTML = `⏹️ 중단 (${i + 1}/${total})`;
+
+                const sRow = sourceRows[i];
+                const sTa = sRow.querySelector('.block-textarea');
+                const text = sTa.value ? sTa.value.trim() : '';
+
+                if (!text) continue; // 원문 셀이 비어 있으면 건너뜀
+
+                // 대응하는 번역문 패널의 셀 찾기
+                const tRow = panels.translation.container.querySelector(`.editor-block-row[data-block-index="${i}"]`);
+                if (!tRow) continue;
+                const tTa = tRow.querySelector('.block-textarea');
+
+                // 제외 키워드 체크 ('제외', '번역제외', '번역 제외' 중 하나가 입력되어 있으면 번역 생략하고 원문 복사)
+                const tVal = tTa.value ? tTa.value.trim() : '';
+                if (tVal === '제외' || tVal === '번역제외' || tVal === '번역 제외') {
+                    tTa.value = text;
+                    tTa.dispatchEvent(new Event('input'));
+                    continue;
+                }
+
+                // 임시로 placeholder와 배경색 등으로 번역 중인 셀임을 시각화
+                const originalBg = tTa.style.backgroundColor;
+                tTa.style.backgroundColor = 'rgba(255, 235, 59, 0.15)'; // 연한 노란색 하이라이트
+                tTa.placeholder = "원문 전체 번역 작업이 순차 진행 중입니다...";
+
+                const taskId = `translate_all_${Date.now()}_${i}`;
+
+                if (window.pywebview && window.pywebview.api) {
+                    try {
+                        const methodEl = document.getElementById('select-translate-method');
+                        const keyEl = document.getElementById('input-deepl-key');
+                        const method = methodEl ? methodEl.value : 'ollama';
+                        const apiKey = keyEl ? keyEl.value : '';
+                        
+                        // 전체 번역 중에는 VRAM unload를 방지하기 위해 마지막 인자(unload_on_limit)를 false로 전달
+                        const res = await window.pywebview.api.translate(text, method, apiKey, taskId, false);
+                        if (res && res.success) {
+                            tTa.value = res.result;
+                            // 인풋 이벤트를 트리거하여 높이 정렬 및 마크다운 프리뷰 갱신
+                            tTa.dispatchEvent(new Event('input'));
+                        } else {
+                            console.error(`셀 ${i + 1} 번역 실패:`, res.error);
+                        }
+                    } catch (err) {
+                        console.error(`셀 ${i + 1} API 연동 중 에러:`, err);
+                    } finally {
+                        tTa.style.backgroundColor = originalBg;
+                    }
+                } else {
+                    // 브라우저 데모 모드 (Mock 데이터 폴백)
+                    await new Promise(resolve => setTimeout(resolve, 800));
+                    tTa.value = `[번역 완료] ${text}`;
+                    tTa.dispatchEvent(new Event('input'));
+                    tTa.style.backgroundColor = originalBg;
+                }
+            }
+
+            // 전체 번역이 성공적으로 완료되었거나 중단된 후, 수동으로 VRAM 해제 및 GC 요청
+            if (window.pywebview && window.pywebview.api) {
+                try {
+                    await window.pywebview.api.unload_vram();
+                } catch (err) {
+                    console.error("VRAM 정리 API 호출 에러:", err);
+                }
+            }
+
+            isTranslatingAll = false;
+            btnTranslateAll.disabled = false;
+            btnTranslateAll.style.backgroundColor = 'var(--primary-color)';
+            btnTranslateAll.innerHTML = '🌐 전체 번역';
+            btnTranslateAll.title = originalTitle;
+        }
+
+        if (btnTranslateAll) {
+            btnTranslateAll.addEventListener('click', translateAllBlocks);
+        }
+
+        // ----------------------------------------------------------------------
+        // 번역문 전체 요약 (배치 처리) 기능 구현
+        // ----------------------------------------------------------------------
+        let isSummarizingAll = false;
+        let cancelSummarizeAll = false;
+        const btnSummarizeAll = document.getElementById('btn-summarize-all');
+
+        async function summarizeAllBlocks() {
+            if (isSummarizingAll) {
+                // 이미 요약 중이면 중단 요청 설정
+                cancelSummarizeAll = true;
+                btnSummarizeAll.innerHTML = '⏳ 중단 대기 중...';
+                btnSummarizeAll.disabled = true;
+                return;
+            }
+
+            const translationRows = panels.translation.container.querySelectorAll('.editor-block-row');
+            const sourceRows = panels.source.container.querySelectorAll('.editor-block-row');
+            const total = translationRows.length;
+            if (total === 0) {
+                alert("요약할 번역문 셀이 없습니다.");
+                return;
+            }
+
+            isSummarizingAll = true;
+            cancelSummarizeAll = false;
+            btnSummarizeAll.style.backgroundColor = '#d32f2f'; // 중단 버튼 색상 (Red)
+            btnSummarizeAll.innerHTML = '⏹️ 요약 중단';
+
+            const originalTitle = btnSummarizeAll.title;
+            btnSummarizeAll.title = "요약 작업을 중단하려면 클릭하세요.";
+
+            for (let i = 0; i < total; i++) {
+                if (cancelSummarizeAll) {
+                    alert("번역문 전체 요약 작업이 사용자에 의해 중단되었습니다.");
+                    break;
+                }
+
+                // 버튼 내 실시간 진척도 업데이트
+                btnSummarizeAll.innerHTML = `⏹️ 중단 (${i + 1}/${total})`;
+
+                const tRow = translationRows[i];
+                const tTa = tRow.querySelector('.block-textarea');
+                const transText = tTa.value ? tTa.value.trim() : '';
+
+                if (!transText) continue; // 번역문 셀이 비어 있으면 건너뜀
+
+                // 대응하는 요약문 패널의 셀 찾기
+                const sumRow = panels.summary.container.querySelector(`.editor-block-row[data-block-index="${i}"]`);
+                if (!sumRow) continue;
+                const sumTa = sumRow.querySelector('.block-textarea');
+
+                // 요약 제외 키워드 체크 ('요약 제외', '요약제외', '제외' 중 하나가 입력되어 있으면 요약 생략하고 번역문 복사)
+                const sumVal = sumTa.value ? sumTa.value.trim() : '';
+                if (sumVal === '요약 제외' || sumVal === '요약제외' || sumVal === '제외') {
+                    sumTa.value = transText;
+                    sumTa.dispatchEvent(new Event('input'));
+                    continue;
+                }
+
+                // 대응하는 원문 셀(Source Cell)의 텍스트 가져오기
+                const sRow = sourceRows[i];
+                const sTa = sRow ? sRow.querySelector('.block-textarea') : null;
+                const sourceText = sTa ? sTa.value.trim() : '';
+
+                // 조건 검사:
+                // 1. 번역되지 않고 원문 그대로 나온 경우 (띄어쓰기 제외하고 비교)
+                const cleanSource = sourceText.replace(/\s+/g, '');
+                const cleanTrans = transText.replace(/\s+/g, '');
+                const isSourceUnchanged = (cleanSource !== "" && cleanSource === cleanTrans);
+                
+                // 2. 혹은 한국어로 번역이 되었더라도 제목과 같이 30음절(공백 포함 글자 수 30자) 이내인 경우
+                const isShortText = (transText.length <= 30);
+
+                if (isSourceUnchanged || isShortText) {
+                    // 요약을 하지 않고 번역문 결과를 그대로 요약문으로 지정
+                    sumTa.value = transText;
+                    sumTa.dispatchEvent(new Event('input'));
+                    continue;
+                }
+
+                // 임시로 placeholder와 배경색 등으로 요약 중인 셀임을 시각화
+                const originalBg = sumTa.style.backgroundColor;
+                sumTa.style.backgroundColor = 'rgba(255, 235, 59, 0.15)'; // 연한 노란색 하이라이트
+                sumTa.placeholder = "번역문 전체 요약 작업이 순차 진행 중입니다...";
+
+                const taskId = `summarize_all_${Date.now()}_${i}`;
+
+                const methodEl = document.getElementById('select-summarize-method');
+                const keyEl = document.getElementById('input-gemini-key');
+                const method = methodEl ? methodEl.value : 'ollama';
+                const apiKey = keyEl ? keyEl.value : '';
+
+                // Gemini API 무료 한도(15 RPM)를 넘지 않도록 API 호출 직전 4초 대기 시간 부여
+                if (method === 'gemini' && i > 0) {
+                    await new Promise(resolve => setTimeout(resolve, 4000));
+                }
+
+                if (window.pywebview && window.pywebview.api) {
+                    try {
+                        const res = await window.pywebview.api.summarize(transText, method, apiKey, taskId);
+                        if (res && res.success) {
+                            sumTa.value = res.result;
+                            sumTa.dispatchEvent(new Event('input'));
+                        } else {
+                            console.error(`셀 ${i + 1} 요약 실패:`, res.error);
+                            sumTa.value = `[요약 실패: ${res.error}]`;
+                            sumTa.dispatchEvent(new Event('input'));
+                        }
+                    } catch (err) {
+                        console.error(`셀 ${i + 1} API 연동 중 에러:`, err);
+                        sumTa.value = `[요약 에러: ${err.message}]`;
+                        sumTa.dispatchEvent(new Event('input'));
+                    } finally {
+                        sumTa.style.backgroundColor = originalBg;
+                    }
+                } else {
+                    // 브라우저 데모 모드 (Mock 데이터 폴백)
+                    await new Promise(resolve => setTimeout(resolve, 800));
+                    const mockText = mockSummarize(transText, i);
+                    sumTa.value = mockText;
+                    sumTa.dispatchEvent(new Event('input'));
+                    sumTa.style.backgroundColor = originalBg;
+                }
+            }
+
+            // 전체 요약이 완료된 후 VRAM 해제
+            if (window.pywebview && window.pywebview.api) {
+                try {
+                    await window.pywebview.api.unload_vram();
+                } catch (err) {
+                    console.error("VRAM 정리 API 호출 에러:", err);
+                }
+            }
+
+            isSummarizingAll = false;
+            btnSummarizeAll.disabled = false;
+            btnSummarizeAll.style.backgroundColor = 'var(--accent-color)';
+            btnSummarizeAll.innerHTML = '📝 전체 요약';
+            btnSummarizeAll.title = originalTitle;
+        }
+
+        if (btnSummarizeAll) {
+            btnSummarizeAll.addEventListener('click', summarizeAllBlocks);
+        }
+
+        // ----------------------------------------------------------------------
+        // 파일 개별 및 전체 저장 바인딩
+        // ----------------------------------------------------------------------
+        const saveButtons = {
+            source: document.getElementById('save-btn-source'),
+            translation: document.getElementById('save-btn-translation'),
+            summary: document.getElementById('save-btn-summary')
+        };
+
+        const btnSaveAll = document.getElementById('btn-save-all');
+
+        // 개별 창 저장 처리
+        Object.keys(saveButtons).forEach(panelKey => {
+            const btn = saveButtons[panelKey];
+            if (!btn) return;
+
+            btn.addEventListener('click', async () => {
+                const text = getPanelText(panelKey);
+                if (!text || text.trim() === '') {
+                    alert(`${panelKey === 'source' ? '원문' : panelKey === 'translation' ? '번역문' : '요약문'} 창에 저장할 텍스트가 없습니다.`);
+                    return;
+                }
+
+                if (window.pywebview && window.pywebview.api) {
+                    const defaultName = `${panelKey}.txt`;
+                    const res = await window.pywebview.api.save_file_dialog(defaultName, text);
+                    if (res && res.success) {
+                        alert(`성공적으로 저장되었습니다.\n저장 경로: ${res.path}`);
+                    } else if (res && res.error) {
+                        alert(`저장 중 오류가 발생했습니다: ${res.error}`);
+                    }
+                } else {
+                    alert("로컬 데스크톱 API가 연결되지 않았습니다 (브라우저 모드).");
+                }
+            });
+        });
+
+        // 전체 내용 저장 처리
+        btnSaveAll.addEventListener('click', async () => {
+            const srcText = getPanelText('source').trim();
+            const transText = getPanelText('translation').trim();
+            const sumText = getPanelText('summary').trim();
+
+            if (!srcText || !transText || !sumText) {
+                alert("세 창에 모두 텍스트가 있어야 전체 저장을 수행할 수 있습니다.");
+                return;
+            }
+
+            // 통합 저장 포맷 구성 (세 패널 전체 데이터 + 셀 구분)
+            const combinedContent = `=== SOURCE TEXT ===\n${srcText}\n\n\n=== TRANSLATION TEXT ===\n${transText}\n\n\n=== SUMMARY TEXT ===\n${sumText}`;
+
+            if (window.pywebview && window.pywebview.api) {
+                const defaultName = `triple_project.txt`;
+                const res = await window.pywebview.api.save_file_dialog(defaultName, combinedContent);
+                if (res && res.success) {
+                    alert(`전체 내용이 성공적으로 저장되었습니다.\n저장 경로: ${res.path}`);
+                } else if (res && res.error) {
+                    alert(`저장 중 오류가 발생했습니다: ${res.error}`);
+                }
+            } else {
+                alert("로컬 데스크톱 API가 연결되지 않았습니다 (브라우저 모드).");
+            }
+        });
+
+        // Triple 프로젝트 통합 백업 파일 파싱 및 복원
+        function loadTripleProjectFile(fileContent) {
+            const normalizedContent = fileContent.replace(/\r\n/g, '\n');
+            
+            const sourceMarker = "=== SOURCE TEXT ===\n";
+            const translationMarker = "=== TRANSLATION TEXT ===\n";
+            const summaryMarker = "=== SUMMARY TEXT ===\n";
+            
+            const srcIndex = normalizedContent.indexOf(sourceMarker);
+            const transIndex = normalizedContent.indexOf(translationMarker);
+            const sumIndex = normalizedContent.indexOf(summaryMarker);
+            
+            if (srcIndex === -1 || transIndex === -1 || sumIndex === -1) {
+                alert("선택한 파일은 올바른 Triple 프로젝트 통합 백업 파일이 아닙니다.");
+                return;
+            }
+            
+            const srcStart = srcIndex + sourceMarker.length;
+            const transStart = transIndex + translationMarker.length;
+            const sumStart = sumIndex + summaryMarker.length;
+            
+            const markers = [
+                { type: 'source', start: srcIndex, contentStart: srcStart },
+                { type: 'translation', start: transIndex, contentStart: transStart },
+                { type: 'summary', start: sumIndex, contentStart: sumStart }
+            ].sort((a, b) => a.start - b.start);
+            
+            const parsedData = {};
+            for (let i = 0; i < markers.length; i++) {
+                const current = markers[i];
+                const next = markers[i + 1];
+                
+                let sectionText = "";
+                if (next) {
+                    sectionText = normalizedContent.substring(current.contentStart, next.start);
+                } else {
+                    sectionText = normalizedContent.substring(current.contentStart);
+                }
+                
+                parsedData[current.type] = sectionText.trim();
+            }
+            
+            // 세션 구분선(\n\n\n)을 기준으로 단락 복제
+            const srcCells = parsedData.source.split(/(?:\n[ \t]*){3,}/);
+            const transCells = parsedData.translation.split(/(?:\n[ \t]*){3,}/);
+            const sumCells = parsedData.summary.split(/(?:\n[ \t]*){3,}/);
+            
+            const maxCellCount = Math.max(srcCells.length, transCells.length, sumCells.length);
+            
+            // 모든 패널의 기존 DOM을 비우고 통합 파일의 인덱스 매칭 구조로 생성
+            Object.keys(panels).forEach(key => {
+                const container = panels[key].container;
+                if (!container) return;
+                
+                container.innerHTML = '';
+                
+                let targetCells = [];
+                if (key === 'source') targetCells = srcCells;
+                else if (key === 'translation') targetCells = transCells;
+                else if (key === 'summary') targetCells = sumCells;
+                
+                for (let idx = 0; idx < maxCellCount; idx++) {
+                    const content = (idx < targetCells.length) ? targetCells[idx] : "";
+                    const row = createBlockRowDom(key, idx, content);
+                    container.appendChild(row);
+                }
+                
+                updateMarkdownPreview(key);
+            });
+            
+            reindexAllBlocks();
+            syncBlockHeights();
+            
+            alert("📂 Triple 백업 파일로부터 세 탭의 데이터를 완벽하게 불러와 복원했습니다!");
+        }
+
+        // 'Triple 불러오기' 파일 탐색기 연동 이벤트
+        const btnLoadProject = document.getElementById('btn-load-project');
+        if (btnLoadProject) {
+            btnLoadProject.addEventListener('click', () => {
+                const input = document.createElement('input');
+                input.type = 'file';
+                input.accept = '.txt,.md';
+                input.onchange = e => {
+                    const file = e.target.files[0];
+                    if (!file) return;
+                    
+                    const reader = new FileReader();
+                    reader.onload = event => {
+                        loadTripleProjectFile(event.target.result);
+                    };
+                    reader.readAsText(file, 'UTF-8');
+                };
+                input.click();
+            });
+        }
+
+        // 초기 구동 및 빈 텍스트 초기화 블록 세팅
+        Object.keys(panels).forEach(panelKey => {
+            setPanelText(panelKey, "");
+        });
+
+    </script>
+</body>
+</html>
