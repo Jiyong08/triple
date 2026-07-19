@@ -407,84 +407,95 @@ def main():
     print("=" * 60)
     
     while True:
-        filepath = input("📂 변환할 트리플 MD 파일 경로를 입력하세요 (종료: Enter): ").strip()
-        if not filepath:
-            print("👋 프로그램을 종료합니다.")
-            return
-
-        # 경로 문자열 다듬기 (복사 시 들어가는 큰따옴표/작은따옴표 제거)
-        filepath = filepath.replace('"', '').replace("'", "")
+        print("\n" + "-" * 60)
+        print("💡 여러 파일을 한 번에 변환하려면 경로를 세미콜론(;)으로 구분하여 입력해 주세요.")
+        print("   예: C:\\path\\file1.md; C:\\path\\file2.md")
+        filepaths_input = input("📂 변환할 트리플 MD 파일 경로를 입력하세요 (종료: Enter): ").strip()
         
-        if not os.path.exists(filepath):
-            print(f"❌ 파일을 찾을 수 없습니다: {filepath}\n올바른 경로인지 다시 확인해 주세요.\n")
+        if not filepaths_input:
+            print("👋 프로그램을 종료합니다.")
+            break
+            
+        # 세미콜론(;)으로 파일 경로 분할
+        raw_paths = filepaths_input.split(';')
+        valid_paths = []
+        
+        for p in raw_paths:
+            p_clean = p.strip().replace('"', '').replace("'", "")
+            if not p_clean:
+                continue
+            if not os.path.exists(p_clean):
+                print(f"❌ 파일을 찾을 수 없습니다: {p_clean} (해당 파일은 건너뜁니다.)")
+                continue
+            valid_paths.append(p_clean)
+            
+        if not valid_paths:
+            print("⚠️ 변환 가능한 올바른 파일 경로가 존재하지 않습니다. 다시 입력해 주세요.")
             continue
             
-        break
+        print(f"\n⚡ 총 {len(valid_paths)}개의 파일 변환 작업을 시작합니다...")
+        
+        for filepath in valid_paths:
+            print(f"\n🔄 변환 중: {filepath}")
+            
+            try:
+                with open(filepath, 'r', encoding='utf-8') as f:
+                    content = f.read()
+                    
+                # 1. <br/> 또는 <br> 태그를 기준으로 블록 분할
+                blocks = re.split(r'<br\s*/?>', content)
+                
+                parsed_blocks = []
+                for block in blocks:
+                    block = block.strip()
+                    if not block:
+                        continue
+                        
+                    # 2. 정규식 패턴을 사용하여 원문과 번역문 추출 (요약문 정보는 고의로 무시 및 폐기)
+                    trans_match = re.search(r'<summary>번역문</summary>\s*([\s\S]*?)\s*</details>', block)
+                    src_match = re.search(r'<summary>원문</summary>\s*([\s\S]*?)\s*</details>', block)
+                    
+                    if trans_match or src_match:
+                        translation = trans_match.group(1).strip() if trans_match else ""
+                        source = src_match.group(1).strip() if src_match else ""
+                    else:
+                        # details 태그가 전혀 없는 단일 텍스트 형태 (isAllSame 처리 블록인 경우)
+                        clean_text = re.sub(r'<[^>]+>', '', block).strip()
+                        translation = clean_text
+                        source = clean_text
+                        
+                    # 둘 다 아예 비어있으면 노이즈 블록으로 간주하고 건너뜀
+                    if not translation and not source:
+                        continue
+                        
+                    parsed_blocks.append({
+                        "source": source,
+                        "translation": translation
+                    })
+                    
+                if not parsed_blocks:
+                    print(f"❌ 파싱 실패: {os.path.basename(filepath)} 파일 내에서 유효한 번역문 또는 원문 데이터를 추출하지 못했습니다.")
+                    continue
 
-    print(f"\n⚡ 파일 로딩 및 분석 중: {filepath}")
-    
-    try:
-        with open(filepath, 'r', encoding='utf-8') as f:
-            content = f.read()
-            
-        # 1. <br/> 또는 <br> 태그를 기준으로 블록 분할
-        blocks = re.split(r'<br\s*/?>', content)
-        
-        parsed_blocks = []
-        for block in blocks:
-            block = block.strip()
-            if not block:
-                continue
+                print(f"🔍 총 {len(parsed_blocks)}개의 대조 단락 파싱 완료.")
                 
-            # 2. 정규식 패턴을 사용하여 원문과 번역문 추출 (요약문 정보는 무시 및 폐기)
-            trans_match = re.search(r'<summary>번역문</summary>\s*([\s\S]*?)\s*</details>', block)
-            src_match = re.search(r'<summary>원문</summary>\s*([\s\S]*?)\s*</details>', block)
-            
-            if trans_match or src_match:
-                translation = trans_match.group(1).strip() if trans_match else ""
-                source = src_match.group(1).strip() if src_match else ""
-            else:
-                # details 태그가 전혀 없는 단일 텍스트 형태 (isAllSame 처리 블록인 경우)
-                clean_text = re.sub(r'<[^>]+>', '', block).strip()
-                translation = clean_text
-                source = clean_text
+                # 3. HTML 템플릿 바인딩 및 렌더링
+                html_content = generate_html(parsed_blocks, os.path.basename(filepath))
                 
-            # 둘 다 아예 비어있으면 노이즈 블록으로 간주하고 건너뜀
-            if not translation and not source:
-                continue
+                # 4. 결과 파일 저장 (.md -> .html)
+                dir_name = os.path.dirname(filepath)
+                base_name = os.path.splitext(os.path.basename(filepath))[0]
+                output_filepath = os.path.join(dir_name, f"{base_name}_tablet.html")
                 
-            parsed_blocks.append({
-                "source": source,
-                "translation": translation
-            })
-            
-        if not parsed_blocks:
-            print("❌ 파싱 실패: 파일 내에서 유효한 번역문 또는 원문 데이터를 추출하지 못했습니다.")
-            return
-
-        print(f"🔍 총 {len(parsed_blocks)}개의 대조 단락을 성공적으로 감지 및 파싱했습니다.")
-        
-        # 3. HTML 템플릿 바인딩 및 렌더링
-        html_content = generate_html(parsed_blocks, os.path.basename(filepath))
-        
-        # 4. 결과 파일 저장 (.md -> .html)
-        dir_name = os.path.dirname(filepath)
-        base_name = os.path.splitext(os.path.basename(filepath))[0]
-        output_filepath = os.path.join(dir_name, f"{base_name}_tablet.html")
-        
-        with open(output_filepath, 'w', encoding='utf-8') as f:
-            f.write(html_content)
-            
-        print("\n✨" + "=" * 50)
-        print("🎉 태블릿용 HTML 변환이 성공적으로 완료되었습니다!")
-        print(f"💾 생성된 파일: {output_filepath}")
-        print("💡 변환된 HTML 파일을 태블릿 기기로 복사해서 열면 터치 리딩 모드로 학습하실 수 있습니다.")
-        print("=" * 52)
-        
-    except Exception as e:
-        import traceback
-        print(f"\n❌ 변환 중 오류가 발생했습니다: {e}")
-        traceback.print_exc()
+                with open(output_filepath, 'w', encoding='utf-8') as f:
+                    f.write(html_content)
+                    
+                print(f"🎉 태블릿용 HTML 변환 완료! 생성된 파일: {output_filepath}")
+                
+            except Exception as e:
+                print(f"❌ {os.path.basename(filepath)} 변환 중 오류가 발생했습니다: {e}")
+                
+        print("\n✨ 지정된 파일들의 변환 처리가 모두 완료되었습니다!")
 
 if __name__ == "__main__":
     main()
