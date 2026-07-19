@@ -50,10 +50,10 @@ def render_markdown(text):
     return f"<p>{escaped.replace('\n', '<br/>')}</p>"
 
 # ----------------------------------------------------------------------
-# 3. 태블릿 및 메모 기능 탑재형 HTML 템플릿 생성기
+# 3. 태블릿, 메모 및 번역문 즉석 편집(contenteditable) 탑재형 HTML 생성기
 # ----------------------------------------------------------------------
 def generate_html(parsed_blocks, filename):
-    # 각 블록 HTML 빌드 (메모 영역이 포함된 카드 레이아웃)
+    # 각 블록 HTML 빌드 (메모 영역 및 편집 가능한 번역문 적용)
     cards_html = ""
     for idx, block in enumerate(parsed_blocks):
         src_html = render_markdown(block["source"])
@@ -64,9 +64,9 @@ def generate_html(parsed_blocks, filename):
             <div class="card-num">{idx + 1}</div>
             
             <div class="card-layout-wrapper">
-                <!-- 왼쪽 영역: 번역문 및 원문 아코디언 -->
+                <!-- 왼쪽 영역: 번역문(즉석 편집 가능) 및 원문 아코디언 -->
                 <div class="main-content-area">
-                    <div class="translation-section">
+                    <div class="translation-section" contenteditable="true" data-trans-idx="{idx}" title="터치하여 직접 번역문을 수정할 수 있습니다.">
                         {trans_html}
                     </div>
                     
@@ -96,13 +96,13 @@ def generate_html(parsed_blocks, filename):
         </div>
         """
 
-    # 태블릿 터치 스크린, 8:2 화면 분할 및 로컬 스토리지 메모 자동 저장을 결합한 단일 HTML
+    # 태블릿 터치 스크린, 8:2 화면 분할, 로컬 스토리지 메모 & 번역문 실시간 수정을 결합한 단일 HTML
     html_template = f"""<!DOCTYPE html>
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>{filename} - 태블릿 대조 리딩 & 메모</title>
+    <title>{filename} - 태블릿 대조 리딩 & 즉석 편집 노트</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Noto+Sans+KR:wght@400;500;700&display=swap" rel="stylesheet">
@@ -118,6 +118,8 @@ def generate_html(parsed_blocks, filename):
             --hover-card: #181a24;
             --num-color: #4b526d;
             --memo-bg: #1c1e2b;
+            --edit-hover: #1e2030;
+            --edit-focus: #0f1015;
         }}
 
         body.light-theme {{
@@ -131,6 +133,8 @@ def generate_html(parsed_blocks, filename):
             --hover-card: #f8f9fa;
             --num-color: #8e98a9;
             --memo-bg: #f3f4f8;
+            --edit-hover: #f1f3f7;
+            --edit-focus: #f8f9fa;
         }}
 
         * {{
@@ -272,12 +276,29 @@ def generate_html(parsed_blocks, filename):
             transition: width 0.25s ease-out;
         }}
 
-        /* 번역문 섹션 */
+        /* 번역문 섹션 (더블클릭/터치 즉석 수정 인터페이스 추가) */
         .translation-section {{
             font-size: 1.08rem;
             color: var(--text-primary);
             margin-bottom: 12px;
             word-break: break-word;
+            outline: none;
+            padding: 8px;
+            border-radius: 10px;
+            border: 1px solid transparent;
+            cursor: text;
+            transition: all 0.2s;
+        }}
+
+        .translation-section:hover {{
+            background-color: var(--edit-hover);
+            border-color: var(--border-color);
+        }}
+
+        .translation-section:focus {{
+            background-color: var(--edit-focus);
+            border-color: var(--accent-color);
+            box-shadow: 0 0 0 3px rgba(88, 101, 242, 0.15);
         }}
 
         .translation-section p {{
@@ -466,7 +487,7 @@ def generate_html(parsed_blocks, filename):
     <div class="app-container">
         <header>
             <div class="header-title">
-                📖 {filename} <span>태블릿 대조 & 메모 노트</span>
+                📖 {filename} <span>태블릿 대조 & 즉석 편집 노트</span>
             </div>
             <div class="header-controls">
                 <button class="header-btn" id="memo-toggle-btn">
@@ -474,6 +495,9 @@ def generate_html(parsed_blocks, filename):
                 </button>
                 <button class="header-btn" id="theme-btn">
                     <span id="theme-icon">☀️</span> <span id="theme-text">Light Mode</span>
+                </button>
+                <button class="header-btn" id="reset-data-btn" style="border-color: #ff4d4d; color: #ff4d4d;" title="작성한 메모 및 수정한 번역문을 초기화하고 원본 텍스트로 되돌립니다.">
+                    <span>🧹 초기화</span>
                 </button>
             </div>
         </header>
@@ -483,7 +507,7 @@ def generate_html(parsed_blocks, filename):
         </main>
 
         <footer>
-            Tablet MD to Accordion HTML Converter (With Memo) &copy; 2026.
+            Tablet MD to Accordion HTML Converter (With Instant Edit) &copy; 2026.
         </footer>
     </div>
 
@@ -531,9 +555,12 @@ def generate_html(parsed_blocks, filename):
 
         // 4. 로컬 스토리지 연동 자동 저장 / 복원 로직
         const DOC_KEY_PREFIX = "triple_memo_" + window.location.pathname + "_";
-        const memoInputs = document.querySelectorAll('.memo-input');
+        const TRANS_KEY_PREFIX = "triple_trans_edit_" + window.location.pathname + "_";
 
-        // 저장된 메모 데이터 자동 복원
+        const memoInputs = document.querySelectorAll('.memo-input');
+        const transSections = document.querySelectorAll('.translation-section');
+
+        // 저장된 메모 데이터 및 번역문 수정본 자동 복원
         memoInputs.forEach(input => {{
             const idx = input.getAttribute('data-card-idx');
             const savedValue = localStorage.getItem(DOC_KEY_PREFIX + idx);
@@ -541,10 +568,40 @@ def generate_html(parsed_blocks, filename):
                 input.value = savedValue;
             }}
 
-            // 실시간 메모 입력 자동 저장 (디스크 입출력 오버헤드 최소화)
+            // 메모 실시간 저장
             input.addEventListener('input', () => {{
                 localStorage.setItem(DOC_KEY_PREFIX + idx, input.value);
             }});
+        }});
+
+        transSections.forEach(section => {{
+            const idx = section.getAttribute('data-trans-idx');
+            const savedTrans = localStorage.getItem(TRANS_KEY_PREFIX + idx);
+            
+            // 사용자가 예전에 수정했던 번역문 텍스트가 있으면 덮어쓰기 복원
+            if (savedTrans) {{
+                section.innerHTML = savedTrans;
+            }}
+
+            // 번역문 즉석 편집 시 실시간 자동 저장
+            section.addEventListener('input', () => {{
+                localStorage.setItem(TRANS_KEY_PREFIX + idx, section.innerHTML);
+            }});
+        }});
+
+        // 5. 메모 및 수정된 번역문 일괄 초기화 버튼 동작
+        const resetDataBtn = document.getElementById('reset-data-btn');
+        resetDataBtn.addEventListener('click', () => {{
+            if (confirm("⚠️ 경고: 작성하신 모든 메모와 사용자가 수정한 번역문 텍스트가 전부 초기화되고 원본 내용으로 복원됩니다. 정말 초기화하시겠습니까?")) {{
+                // 이 문서에 연동된 모든 LocalStorage 데이터 삭제
+                Object.keys(localStorage).forEach(key => {{
+                    if (key.startsWith(DOC_KEY_PREFIX) || key.startsWith(TRANS_KEY_PREFIX)) {{
+                        localStorage.removeItem(key);
+                    }}
+                }});
+                alert("🧹 모든 메모 및 번역문 수정 이력이 초기화되었습니다. 페이지를 새로고침합니다.");
+                window.location.reload();
+            }}
         }});
     </script>
 </body>
