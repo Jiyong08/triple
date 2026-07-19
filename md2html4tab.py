@@ -50,10 +50,10 @@ def render_markdown(text):
     return f"<p>{escaped.replace('\n', '<br/>')}</p>"
 
 # ----------------------------------------------------------------------
-# 3. 태블릿 맞춤형 HTML 템플릿 생성기
+# 3. 태블릿 및 메모 기능 탑재형 HTML 템플릿 생성기
 # ----------------------------------------------------------------------
 def generate_html(parsed_blocks, filename):
-    # 각 블록 HTML 빌드
+    # 각 블록 HTML 빌드 (메모 영역이 포함된 카드 레이아웃)
     cards_html = ""
     for idx, block in enumerate(parsed_blocks):
         src_html = render_markdown(block["source"])
@@ -62,29 +62,47 @@ def generate_html(parsed_blocks, filename):
         cards_html += f"""
         <div class="card" data-idx="{idx}">
             <div class="card-num">{idx + 1}</div>
-            <div class="translation-section">
-                {trans_html}
-            </div>
             
-            <details class="source-details">
-                <summary class="source-summary">
-                    <span class="summary-title">🔍 원문 보기 (Show Original)</span>
-                    <span class="summary-arrow">▾</span>
-                </summary>
-                <div class="source-content">
-                    {src_html}
+            <div class="card-layout-wrapper">
+                <!-- 왼쪽 영역: 번역문 및 원문 아코디언 -->
+                <div class="main-content-area">
+                    <div class="translation-section">
+                        {trans_html}
+                    </div>
+                    
+                    <details class="source-details">
+                        <summary class="source-summary">
+                            <span class="summary-title">🔍 원문 보기 (Show Original)</span>
+                            <span class="summary-arrow">▾</span>
+                        </summary>
+                        <div class="source-content">
+                            {src_html}
+                        </div>
+                    </details>
+                    
+                    <div class="card-action-bar">
+                        <button class="btn-write-memo" data-idx="{idx}">
+                            ✍️ 메모 작성
+                        </button>
+                    </div>
                 </div>
-            </details>
+                
+                <!-- 오른쪽 영역: 메모장 셀 (기본 숨김, 8:2 화면 분할 적용 대상) -->
+                <div class="memo-area">
+                    <div class="memo-box-header">📝 메모 셀</div>
+                    <textarea class="memo-input" data-card-idx="{idx}" placeholder="여기에 학습 메모를 입력하세요..."></textarea>
+                </div>
+            </div>
         </div>
         """
 
-    # 태블릿 터치 스크린 및 시원시원한 가독성에 맞춘 최적화 템플릿
+    # 태블릿 터치 스크린, 8:2 화면 분할 및 로컬 스토리지 메모 자동 저장을 결합한 단일 HTML
     html_template = f"""<!DOCTYPE html>
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>{filename} - 태블릿 리딩 리포트</title>
+    <title>{filename} - 태블릿 대조 리딩 & 메모</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Noto+Sans+KR:wght@400;500;700&display=swap" rel="stylesheet">
@@ -99,6 +117,7 @@ def generate_html(parsed_blocks, filename):
             --accent-color: #5865f2;
             --hover-card: #181a24;
             --num-color: #4b526d;
+            --memo-bg: #1c1e2b;
         }}
 
         body.light-theme {{
@@ -111,13 +130,14 @@ def generate_html(parsed_blocks, filename):
             --accent-color: #2b3a8f;
             --hover-card: #f8f9fa;
             --num-color: #8e98a9;
+            --memo-bg: #f3f4f8;
         }}
 
         * {{
             margin: 0;
             padding: 0;
             box-sizing: border-box;
-            -webkit-tap-highlight-color: transparent; /* 모바일 터치 하이라이트 제거 */
+            -webkit-tap-highlight-color: transparent;
         }}
 
         body {{
@@ -131,14 +151,15 @@ def generate_html(parsed_blocks, filename):
             line-height: 1.75;
         }}
 
-        /* 태블릿 반응형 뷰포트 고정 */
+        /* 태블릿 반응형 최대 너비 설정 (메모 셀 노출을 위해 1100px로 확장) */
         .app-container {{
             width: 100%;
-            max-width: 800px;
+            max-width: 1100px;
             margin: 0 auto;
             display: flex;
             flex-direction: column;
             flex: 1;
+            transition: max-width 0.3s;
         }}
 
         /* 상단 고정 헤더 */
@@ -148,7 +169,7 @@ def generate_html(parsed_blocks, filename):
             z-index: 100;
             background-color: var(--bg-header);
             border-bottom: 1px solid var(--border-color);
-            padding: 16px 24px;
+            padding: 14px 24px;
             display: flex;
             justify-content: space-between;
             align-items: center;
@@ -168,8 +189,14 @@ def generate_html(parsed_blocks, filename):
             margin-left: 8px;
         }}
 
-        /* 테마 토글 스위치 (터치 감도를 위해 넉넉한 사이즈 부여) */
-        .theme-toggle {{
+        .header-controls {{
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }}
+
+        /* 공통 헤더 제어 버튼 */
+        .header-btn {{
             background: none;
             border: 1px solid var(--border-color);
             border-radius: 12px;
@@ -184,11 +211,18 @@ def generate_html(parsed_blocks, filename):
             gap: 8px;
         }}
 
-        .theme-toggle:active {{
+        .header-btn:active {{
             transform: scale(0.97);
         }}
 
-        /* 메인 컨텐츠 리딩 에어리어 */
+        /* 메모표시 활성화 버튼 하이라이트 */
+        .header-btn.active {{
+            background-color: var(--accent-color);
+            border-color: var(--accent-color);
+            color: #ffffff;
+        }}
+
+        /* 메인 컨텐츠 영역 */
         main {{
             flex: 1;
             padding: 24px 16px;
@@ -199,7 +233,7 @@ def generate_html(parsed_blocks, filename):
             background-color: var(--bg-surface);
             border: 1px solid var(--border-color);
             border-radius: 18px;
-            padding: 28px;
+            padding: 24px;
             margin-bottom: 24px;
             position: relative;
             box-shadow: 0 4px 15px rgba(0, 0, 0, 0.08);
@@ -208,7 +242,6 @@ def generate_html(parsed_blocks, filename):
 
         .card:hover {{
             border-color: var(--accent-color);
-            box-shadow: 0 6px 20px rgba(0, 0, 0, 0.12);
         }}
 
         /* 행 번호 배지 */
@@ -226,9 +259,22 @@ def generate_html(parsed_blocks, filename):
             user-select: none;
         }}
 
-        /* 한글 번역문 섹션 (기본 노출) */
+        /* 가로 카드 레이아웃 구조 */
+        .card-layout-wrapper {{
+            display: flex;
+            gap: 20px;
+            width: 100%;
+        }}
+
+        /* 번역문/원문 메인 텍스트 셀 (메모 비활성화 시 100%, 활성화 시 80%) */
+        .main-content-area {{
+            width: 100%;
+            transition: width 0.25s ease-out;
+        }}
+
+        /* 번역문 섹션 */
         .translation-section {{
-            font-size: 1.08rem; /* 태블릿 가독성에 최적화된 큰 텍스트 */
+            font-size: 1.08rem;
             color: var(--text-primary);
             margin-bottom: 12px;
             word-break: break-word;
@@ -244,17 +290,16 @@ def generate_html(parsed_blocks, filename):
 
         /* 원문 아코디언 접기 상자 */
         .source-details {{
-            margin-top: 18px;
+            margin-top: 16px;
             border-top: 1px dashed var(--border-color);
-            padding-top: 18px;
+            padding-top: 16px;
         }}
 
-        /* 아코디언 헤더 (터치 영역 확보를 위해 padding을 넓게 배치) */
         .source-summary {{
             display: flex;
             justify-content: space-between;
             align-items: center;
-            padding: 14px 20px;
+            padding: 12px 18px;
             background-color: var(--bg-primary);
             border: 1px solid var(--border-color);
             border-radius: 12px;
@@ -263,20 +308,10 @@ def generate_html(parsed_blocks, filename):
             font-weight: 600;
             cursor: pointer;
             user-select: none;
-            list-style: none; /* 기본 삼각형 숨김 */
+            list-style: none;
             transition: all 0.2s;
         }}
 
-        .source-summary:hover {{
-            border-color: var(--accent-color);
-            color: var(--text-primary);
-        }}
-
-        .source-summary:active {{
-            transform: scale(0.98);
-        }}
-
-        /* Chrome/Safari 기본 접기 아이콘 강제 제거 */
         .source-summary::-webkit-details-marker {{
             display: none;
         }}
@@ -287,7 +322,6 @@ def generate_html(parsed_blocks, filename):
             color: var(--accent-color);
         }}
 
-        /* 아코디언 열렸을 때 화살표 회전 및 헤더 스타일 전환 */
         details[open] .summary-arrow {{
             transform: rotate(180deg);
         }}
@@ -299,7 +333,6 @@ def generate_html(parsed_blocks, filename):
             background-color: var(--hover-card);
         }}
 
-        /* 영어 원문 컨텐츠 본문 */
         .source-content {{
             padding: 20px;
             background-color: var(--hover-card);
@@ -310,12 +343,88 @@ def generate_html(parsed_blocks, filename):
             font-size: 0.98rem;
             color: var(--text-secondary);
             word-break: break-word;
-            animation: slideDown 0.2s ease-out;
         }}
 
-        @keyframes slideDown {{
-            from {{ opacity: 0; transform: translateY(-5px); }}
-            to {{ opacity: 1; transform: translateY(0); }}
+        /* 카드별 액션바 (메모 작성 버튼 배치) */
+        .card-action-bar {{
+            margin-top: 14px;
+            display: flex;
+            justify-content: flex-end;
+        }}
+
+        .btn-write-memo {{
+            background-color: transparent;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            color: var(--text-secondary);
+            padding: 8px 14px;
+            font-size: 0.85rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+        }}
+
+        .btn-write-memo:hover {{
+            border-color: var(--accent-color);
+            color: var(--text-primary);
+        }}
+
+        .btn-write-memo:active {{
+            transform: scale(0.96);
+        }}
+
+        /* 오른쪽 메모장 셀 (기본 숨김, 활성화 시 20% 분할 레이아웃 노출) */
+        .memo-area {{
+            display: none;
+            width: 0;
+            opacity: 0;
+            overflow: hidden;
+            flex-direction: column;
+            border-left: 2px solid var(--border-color);
+            padding-left: 0;
+            transition: width 0.25s ease-out, opacity 0.25s ease-out, padding-left 0.25s ease-out;
+        }}
+
+        .memo-box-header {{
+            font-size: 0.85rem;
+            font-weight: 700;
+            color: var(--accent-color);
+            margin-bottom: 8px;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }}
+
+        .memo-input {{
+            flex: 1;
+            width: 100%;
+            background-color: var(--memo-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 10px;
+            padding: 12px;
+            color: var(--text-primary);
+            font-family: inherit;
+            font-size: 0.9rem;
+            resize: none;
+            outline: none;
+            transition: border-color 0.2s;
+        }}
+
+        .memo-input:focus {{
+            border-color: var(--accent-color);
+        }}
+
+        /* --------------------------------------------------
+           ★ 8:2 화면 레이아웃 토글 CSS 클래스 (show-memos)
+           -------------------------------------------------- */
+        .show-memos .main-content-area {{
+            width: 80%; /* 번역문+원문 80% */
+        }}
+
+        .show-memos .memo-area {{
+            display: flex;
+            width: 20%; /* 메모장 셀 20% */
+            opacity: 1;
+            padding-left: 20px;
         }}
 
         /* 마크다운 공통 타이포그래피 */
@@ -357,10 +466,13 @@ def generate_html(parsed_blocks, filename):
     <div class="app-container">
         <header>
             <div class="header-title">
-                📖 {filename} <span>태블릿 대조 노트</span>
+                📖 {filename} <span>태블릿 대조 & 메모 노트</span>
             </div>
             <div class="header-controls">
-                <button class="theme-toggle" id="theme-btn">
+                <button class="header-btn" id="memo-toggle-btn">
+                    <span>📝 메모 표시</span> <span class="toggle-status">꺼짐</span>
+                </button>
+                <button class="header-btn" id="theme-btn">
                     <span id="theme-icon">☀️</span> <span id="theme-text">Light Mode</span>
                 </button>
             </div>
@@ -371,7 +483,7 @@ def generate_html(parsed_blocks, filename):
         </main>
 
         <footer>
-            Tablet MD to Accordion HTML Converter &copy; 2026.
+            Tablet MD to Accordion HTML Converter (With Memo) &copy; 2026.
         </footer>
     </div>
 
@@ -380,12 +492,59 @@ def generate_html(parsed_blocks, filename):
         const themeIcon = document.getElementById('theme-icon');
         const themeText = document.getElementById('theme-text');
         
-        // 태블릿 모드 테마 스위칭 핸들러
+        const memoToggleBtn = document.getElementById('memo-toggle-btn');
+        const appContainer = document.querySelector('.app-container');
+        
+        // 1. 시스템 테마 스위칭 핸들러
         themeBtn.addEventListener('click', () => {{
             document.body.classList.toggle('light-theme');
             const isLight = document.body.classList.contains('light-theme');
             themeIcon.textContent = isLight ? '🌙' : '☀️';
             themeText.textContent = isLight ? 'Dark Mode' : 'Light Mode';
+        }});
+
+        // 2. 메모 셀 8:2 토글 컨트롤러
+        memoToggleBtn.addEventListener('click', () => {{
+            appContainer.classList.toggle('show-memos');
+            const isShowing = appContainer.classList.contains('show-memos');
+            memoToggleBtn.classList.toggle('active', isShowing);
+            memoToggleBtn.querySelector('.toggle-status').textContent = isShowing ? "켜짐" : "꺼짐";
+        }});
+
+        // 3. 메모 작성 버튼 핸들러 (클릭 시 자동으로 메모 셀을 켜고 입력창 포커싱)
+        document.querySelectorAll('.btn-write-memo').forEach(btn => {{
+            btn.addEventListener('click', () => {{
+                const idx = btn.getAttribute('data-idx');
+                
+                // 메모 창이 꺼져 있으면 자동으로 활성화
+                if (!appContainer.classList.contains('show-memos')) {{
+                    memoToggleBtn.click();
+                }}
+                
+                // 해당 카드의 메모 textarea 포커싱 및 스크롤
+                const targetTextarea = document.querySelector(`.memo-input[data-card-idx="${{idx}}"]`);
+                if (targetTextarea) {{
+                    targetTextarea.focus();
+                }}
+            }});
+        }});
+
+        // 4. 로컬 스토리지 연동 자동 저장 / 복원 로직
+        const DOC_KEY_PREFIX = "triple_memo_" + window.location.pathname + "_";
+        const memoInputs = document.querySelectorAll('.memo-input');
+
+        // 저장된 메모 데이터 자동 복원
+        memoInputs.forEach(input => {{
+            const idx = input.getAttribute('data-card-idx');
+            const savedValue = localStorage.getItem(DOC_KEY_PREFIX + idx);
+            if (savedValue) {{
+                input.value = savedValue;
+            }}
+
+            // 실시간 메모 입력 자동 저장 (디스크 입출력 오버헤드 최소화)
+            input.addEventListener('input', () => {{
+                localStorage.setItem(DOC_KEY_PREFIX + idx, input.value);
+            }});
         }});
     </script>
 </body>
